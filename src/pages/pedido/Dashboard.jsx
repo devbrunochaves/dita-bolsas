@@ -1,69 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { getClientes, getProdutos, getPedidos, updatePedidoStatus } from '../../utils/storage'
-
-// ── Configuração de cada status ──────────────────────────────
-const STATUS_CONFIG = {
-  PENDENTE:      { label: 'PENDENTE',      color: '#B45309', bg: '#FEF3C7', border: '#FDE68A', dot: '#F59E0B' },
-  'EM PRODUÇÃO': { label: 'EM PRODUÇÃO',   color: '#166534', bg: '#DCFCE7', border: '#86EFAC', dot: '#22C55E' },
-  ATRASADO:      { label: 'ATRASADO',      color: '#991B1B', bg: '#FEE2E2', border: '#FECACA', dot: '#EF4444' },
-  ENTREGUE:      { label: 'ENTREGUE',      color: '#374151', bg: '#F3F4F6', border: '#D1D5DB', dot: '#9CA3AF' },
-}
-
-const STATUS_LIST = ['PENDENTE', 'EM PRODUÇÃO', 'ATRASADO', 'ENTREGUE']
-
-// ── Badge de status ──────────────────────────────────────────
-function StatusBadge({ status }) {
-  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.PENDENTE
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 5,
-      padding: '4px 10px', borderRadius: 100, fontSize: 11, fontWeight: 700,
-      color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}`,
-      whiteSpace: 'nowrap', letterSpacing: 0.3,
-    }}>
-      <span style={{ width: 6, height: 6, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
-      {cfg.label}
-    </span>
-  )
-}
-
-// ── Select inline de status ──────────────────────────────────
-function StatusSelect({ pedidoId, current, onChange }) {
-  const [saving, setSaving] = useState(false)
-  const cfg = STATUS_CONFIG[current] || STATUS_CONFIG.PENDENTE
-
-  async function handleChange(e) {
-    const novoStatus = e.target.value
-    setSaving(true)
-    try {
-      await updatePedidoStatus(pedidoId, novoStatus)
-      onChange(pedidoId, novoStatus)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <select
-      value={current}
-      onChange={handleChange}
-      disabled={saving}
-      style={{
-        fontSize: 11, fontWeight: 700, padding: '4px 8px', borderRadius: 100,
-        border: `1px solid ${cfg.border}`, color: cfg.color, background: cfg.bg,
-        cursor: 'pointer', outline: 'none', appearance: 'none',
-        paddingRight: 20, opacity: saving ? 0.6 : 1,
-        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='${encodeURIComponent(cfg.color)}' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E")`,
-        backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center',
-      }}
-    >
-      {STATUS_LIST.map(s => (
-        <option key={s} value={s}>{s}</option>
-      ))}
-    </select>
-  )
-}
+import { getClientes, getProdutos, getPedidos } from '../../utils/storage'
+import { StatusSelect, STATUS_CONFIG, STATUS_LIST } from '../../components/StatusSelect'
 
 // ── Card de estatística ──────────────────────────────────────
 function StatCard({ icon, label, value, color, to }) {
@@ -180,30 +118,6 @@ export default function Dashboard() {
         <StatCard icon="👥" label="Clientes cadastrados" value={clientes.length} color="#1B6E3C" to="/pedido/clientes" />
         <StatCard icon="📦" label="Produtos cadastrados" value={produtos.length} color="#2563EB" to="/pedido/produtos" />
         <StatCard icon="📋" label="Pedidos emitidos"     value={pedidos.length}  color="#D97706" to="/pedido" />
-      </div>
-
-      {/* Ações rápidas */}
-      <div style={{ marginBottom: 28 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, color: '#374151', marginBottom: 14 }}>Ações Rápidas</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
-          {[
-            { to: '/pedido/emitir',        icon: '📋', label: 'Emitir Pedido',  color: '#1B6E3C', bg: '#E8F5ED' },
-            { to: '/pedido/clientes/novo', icon: '➕', label: 'Novo Cliente',   color: '#2563EB', bg: '#EFF6FF' },
-            { to: '/pedido/produtos/novo', icon: '📦', label: 'Novo Produto',   color: '#D97706', bg: '#FFFBEB' },
-            { to: '/pedido/clientes',      icon: '👥', label: 'Ver Clientes',   color: '#7C3AED', bg: '#F5F3FF' },
-          ].map(action => (
-            <Link key={action.to} to={action.to} style={{
-              background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '18px 16px',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-              textDecoration: 'none', textAlign: 'center', transition: 'all 0.2s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = action.bg; e.currentTarget.style.borderColor = action.color + '40' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = '#E5E7EB' }}>
-              <div style={{ width: 42, height: 42, borderRadius: 12, background: action.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{action.icon}</div>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>{action.label}</span>
-            </Link>
-          ))}
-        </div>
       </div>
 
       {/* Cards de status dos pedidos */}

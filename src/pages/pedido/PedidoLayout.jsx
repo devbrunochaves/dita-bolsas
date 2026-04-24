@@ -3,10 +3,11 @@ import { useEffect, useState } from 'react'
 import { seedDadosIniciais } from '../../utils/storage'
 
 const NAV = [
-  { to: '/pedido',           label: 'Dashboard',          icon: '📊', exact: true },
-  { to: '/pedido/emitir',    label: 'Emitir Pedido',      icon: '📋' },
-  { to: '/pedido/clientes',  label: 'Clientes',           icon: '👥' },
-  { to: '/pedido/produtos',  label: 'Produtos',           icon: '📦' },
+  { to: '/pedido',                    label: 'Dashboard',         icon: '📊', exact: true },
+  { to: '/pedido/emitir',             label: 'Emitir Pedido',     icon: '📋' },
+  { to: '/pedido/pedidos-emitidos',   label: 'Pedidos Emitidos',  icon: '📑' },
+  { to: '/pedido/clientes',           label: 'Clientes',          icon: '👥' },
+  { to: '/pedido/produtos',           label: 'Produtos',          icon: '📦' },
 ]
 
 export default function PedidoLayout() {

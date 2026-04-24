@@ -12,6 +12,7 @@ import CadastroCliente from './pages/pedido/CadastroCliente'
 import CadastroProduto from './pages/pedido/CadastroProduto'
 import ListaClientes from './pages/pedido/ListaClientes'
 import ListaProdutos from './pages/pedido/ListaProdutos'
+import PedidosEmitidos from './pages/pedido/PedidosEmitidos'
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
       <Route path="/pedido" element={<PedidoLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="emitir" element={<EmitirPedido />} />
+        <Route path="pedidos-emitidos" element={<PedidosEmitidos />} />
         <Route path="clientes" element={<ListaClientes />} />
         <Route path="clientes/novo" element={<CadastroCliente />} />
         <Route path="clientes/editar/:id" element={<CadastroCliente />} />
