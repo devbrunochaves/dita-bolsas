@@ -193,6 +193,8 @@ export async function savePedido(pedido) {
     desconto:         Number(pedido.desconto || 0),
     valor_final:      Number(pedido.valorFinal || 0),
     observacoes:      pedido.observacoes || '',
+    status:           'PENDENTE',
+    emitido_por:      pedido.emitidoPor || null,
   }
 
   const { data, error } = await supabase
@@ -209,6 +211,14 @@ export async function deletePedido(id) {
   check(error, 'deletePedido')
 }
 
+export async function updatePedidoStatus(id, status) {
+  const { error } = await supabase
+    .from('pedidos')
+    .update({ status })
+    .eq('id', id)
+  check(error, 'updatePedidoStatus')
+}
+
 function mapPedido(r) {
   if (!r) return null
   return {
@@ -220,6 +230,8 @@ function mapPedido(r) {
     valorFinal:  Number(r.valor_final || 0),
     observacoes: r.observacoes || '',
     dataCriacao: r.created_at,
+    status:      r.status || 'PENDENTE',
+    emitidoPor:  r.emitido_por || null,
   }
 }
 
