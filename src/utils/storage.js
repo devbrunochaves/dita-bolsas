@@ -180,6 +180,17 @@ export async function getPedidos() {
 }
 
 export async function savePedido(pedido) {
+  // Usuário logado
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // Nome do emitente via profile
+  let nomeEmitente = pedido.emitidoPor || null
+  if (user && !nomeEmitente) {
+    const { data: prof } = await supabase
+      .from('profiles').select('nome').eq('id', user.id).single()
+    nomeEmitente = prof?.nome || user.email || null
+  }
+
   // Busca o próximo número
   const { count } = await supabase
     .from('pedidos')
@@ -194,7 +205,8 @@ export async function savePedido(pedido) {
     valor_final:      Number(pedido.valorFinal || 0),
     observacoes:      pedido.observacoes || '',
     status:           'PENDENTE',
-    emitido_por:      pedido.emitidoPor || null,
+    emitido_por:      nomeEmitente,
+    user_id:          user?.id || null,
   }
 
   const { data, error } = await supabase
@@ -233,6 +245,45 @@ function mapPedido(r) {
     status:      r.status || 'PENDENTE',
     emitidoPor:  r.emitido_por || null,
   }
+}
+
+// ============================================================
+//  PROFILES
+// ============================================================
+
+export async function getProfiles() {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('nome')
+  check(error, 'getProfiles')
+  return data || []
+}
+
+export async function updateProfile(id, updates) {
+  const { error } = await supabase
+    .from('profiles')
+    .update(updates)
+    .eq('id', id)
+  check(error, 'updateProfile')
+}
+
+export async function criarColaborador({ email, password, nome, tipo }) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { nome, tipo } },
+  })
+  if (error) throw new Error(error.message)
+
+  // Garante que o profile existe com tipo correto
+  if (data.user?.id) {
+    await supabase.from('profiles').upsert(
+      { id: data.user.id, nome, email, tipo },
+      { onConflict: 'id' }
+    )
+  }
+  return data
 }
 
 // ============================================================
