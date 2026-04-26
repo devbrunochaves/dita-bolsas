@@ -398,20 +398,52 @@ export default function EmitirPedido() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <style>{`
+                .item-grid {
+                  display: grid;
+                  grid-template-columns: 56px 1fr 70px 110px 110px 76px;
+                  gap: 8px;
+                  align-items: center;
+                  background: #F8FAFC;
+                  border-radius: 10px;
+                  padding: 10px 6px;
+                  border: 1px solid #E5E7EB;
+                }
+                .item-grid-header {
+                  display: grid;
+                  grid-template-columns: 56px 1fr 70px 110px 110px 76px;
+                  gap: 8px;
+                  padding: 0 6px 4px;
+                }
+                .item-col-qtd, .item-col-unit, .item-col-total { }
+                .item-col-header-qtd, .item-col-header-unit, .item-col-header-total { }
+
+                @media (max-width: 768px) {
+                  .item-grid {
+                    grid-template-columns: 52px 1fr 76px !important;
+                  }
+                  .item-grid-header {
+                    grid-template-columns: 52px 1fr 76px !important;
+                  }
+                  .item-col-qtd, .item-col-unit, .item-col-total,
+                  .item-col-header-qtd, .item-col-header-unit, .item-col-header-total {
+                    display: none !important;
+                  }
+                }
+              `}</style>
+
               {/* Cabeçalho da lista */}
-              <div style={{ display: 'grid', gridTemplateColumns: '56px 1fr 70px 110px 110px 76px', gap: 8, padding: '0 6px 4px' }}>
-                {['Cód.', 'Produto', 'Qtd.', 'Vr. Unit.', 'Vr. Total', ''].map(h => (
-                  <div key={h} style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5 }}>{h}</div>
-                ))}
+              <div className="item-grid-header">
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5 }}>Cód.</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5 }}>Produto</div>
+                <div className="item-col-header-qtd" style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5 }}>Qtd.</div>
+                <div className="item-col-header-unit" style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5 }}>Vr. Unit.</div>
+                <div className="item-col-header-total" style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5 }}>Vr. Total</div>
+                <div />
               </div>
 
               {itens.map((item, i) => (
-                <div key={i} style={{
-                  display: 'grid', gridTemplateColumns: '56px 1fr 70px 110px 110px 76px',
-                  gap: 8, alignItems: 'center',
-                  background: '#F8FAFC', borderRadius: 10, padding: '10px 6px',
-                  border: '1px solid #E5E7EB',
-                }}>
+                <div key={i} className="item-grid">
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#6B7280' }}>{item.codigo}</div>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: '#1F2937' }}>{item.nome}</div>
@@ -421,33 +453,13 @@ export default function EmitirPedido() {
                       </div>
                     )}
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1F2937', textAlign: 'center' }}>{item.quantidade}</div>
-                  <div style={{ fontSize: 13, color: '#6B7280', textAlign: 'right' }}>R$ {fmtBRL(item.vrUnitario)}</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1B6E3C', textAlign: 'right' }}>R$ {fmtBRL(item.vrTotal)}</div>
+                  <div className="item-col-qtd" style={{ fontSize: 13, fontWeight: 700, color: '#1F2937', textAlign: 'center' }}>{item.quantidade}</div>
+                  <div className="item-col-unit" style={{ fontSize: 13, color: '#6B7280', textAlign: 'right' }}>R$ {fmtBRL(item.vrUnitario)}</div>
+                  <div className="item-col-total" style={{ fontSize: 13, fontWeight: 700, color: '#1B6E3C', textAlign: 'right' }}>R$ {fmtBRL(item.vrTotal)}</div>
                   {/* Botões editar + remover */}
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <button
-                      type="button"
-                      onClick={() => abrirEdicao(i)}
-                      title="Editar item"
-                      style={{
-                        width: 32, height: 32, borderRadius: 8,
-                        border: '1px solid #BFDBFE', background: '#EFF6FF',
-                        color: '#2563EB', cursor: 'pointer', fontSize: 14,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}
-                    >✏️</button>
-                    <button
-                      type="button"
-                      onClick={() => removeItem(i)}
-                      title="Remover item"
-                      style={{
-                        width: 32, height: 32, borderRadius: 8,
-                        border: '1px solid #FECACA', background: '#FEF2F2',
-                        color: '#DC2626', cursor: 'pointer', fontSize: 16,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}
-                    >×</button>
+                    <button type="button" onClick={() => abrirEdicao(i)} title="Editar item" style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid #BFDBFE', background: '#EFF6FF', color: '#2563EB', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✏️</button>
+                    <button type="button" onClick={() => removeItem(i)} title="Remover item" style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid #FECACA', background: '#FEF2F2', color: '#DC2626', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
                   </div>
                 </div>
               ))}
