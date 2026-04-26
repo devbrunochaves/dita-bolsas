@@ -2,11 +2,15 @@ import { useState, useEffect, useRef } from 'react'
 import { getClientes, getProdutos, savePedido } from '../../utils/storage'
 import { gerarPedidoPDF } from '../../utils/pdf'
 
-// ── Modal de adicionar produto ───────────────────────────────
-function ModalProduto({ produtos, onAdicionar, onClose }) {
-  const [produtoSelecionado, setProdutoSelecionado] = useState(null)
-  const [quantidade, setQuantidade]                 = useState('')
-  const [observacoes, setObservacoes]               = useState('')
+// ── Modal de adicionar / editar produto ─────────────────────
+function ModalProduto({ produtos, onAdicionar, onClose, itemInicial }) {
+  const modoEdicao = !!itemInicial
+
+  const [produtoSelecionado, setProdutoSelecionado] = useState(
+    itemInicial ? (produtos.find(p => p.codigo === itemInicial.codigo) || null) : null
+  )
+  const [quantidade, setQuantidade] = useState(itemInicial?.quantidade || '')
+  const [observacoes, setObservacoes] = useState(itemInicial?.observacoes || '')
 
   const fmtBRL = v => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
 
@@ -14,8 +18,7 @@ function ModalProduto({ produtos, onAdicionar, onClose }) {
     const codigo = e.target.value
     const prod = produtos.find(p => p.codigo === codigo) || null
     setProdutoSelecionado(prod)
-    setQuantidade('')
-    setObservacoes('')
+    if (!modoEdicao) { setQuantidade(''); setObservacoes('') }
   }
 
   function handleAdicionar() {
@@ -56,7 +59,9 @@ function ModalProduto({ produtos, onAdicionar, onClose }) {
           padding: '20px 24px 16px', borderBottom: '1px solid #F3F4F6',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
-          <h3 style={{ fontSize: 16, fontWeight: 800, color: '#1F2937' }}>📦 Adicionar Produto</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 800, color: '#1F2937' }}>
+            {modoEdicao ? '✏️ Editar Produto' : '📦 Adicionar Produto'}
+          </h3>
           <button onClick={onClose} style={{
             width: 32, height: 32, borderRadius: 8, border: '1px solid #E5E7EB',
             background: '#F9FAFB', color: '#6B7280', cursor: 'pointer', fontSize: 18,
@@ -149,7 +154,7 @@ function ModalProduto({ produtos, onAdicionar, onClose }) {
             />
           </div>
 
-          {/* Botão adicionar */}
+          {/* Botão confirmar */}
           <button
             onClick={handleAdicionar}
             disabled={!produtoSelecionado || !quantidade}
@@ -160,7 +165,7 @@ function ModalProduto({ produtos, onAdicionar, onClose }) {
               transition: 'background 0.2s',
             }}
           >
-            ＋ Adicionar ao Pedido
+            {modoEdicao ? '💾 Salvar Alterações' : '＋ Adicionar ao Pedido'}
           </button>
         </div>
       </div>
@@ -179,6 +184,7 @@ export default function EmitirPedido() {
   const [desconto, setDesconto]                     = useState('')
   const [observacoes, setObservacoes]               = useState('Orçamento válido pelo período de 30 dias')
   const [modalAberto, setModalAberto]               = useState(false)
+  const [editIndex, setEditIndex]                   = useState(null)
   const [success, setSuccess]                       = useState(false)
   const [loading, setLoading]                       = useState(true)
   const dropdownRef = useRef(null)
@@ -217,8 +223,19 @@ export default function EmitirPedido() {
   }
 
   function handleAdicionarItem(item) {
-    setItens(prev => [...prev, item])
+    if (editIndex !== null) {
+      // modo edição — substitui o item no índice
+      setItens(prev => prev.map((it, i) => i === editIndex ? item : it))
+      setEditIndex(null)
+    } else {
+      setItens(prev => [...prev, item])
+    }
     setModalAberto(false)
+  }
+
+  function abrirEdicao(index) {
+    setEditIndex(index)
+    setModalAberto(true)
   }
 
   function removeItem(index) {
@@ -273,7 +290,8 @@ export default function EmitirPedido() {
         <ModalProduto
           produtos={produtos}
           onAdicionar={handleAdicionarItem}
-          onClose={() => setModalAberto(false)}
+          onClose={() => { setModalAberto(false); setEditIndex(null) }}
+          itemInicial={editIndex !== null ? itens[editIndex] : null}
         />
       )}
 
@@ -381,7 +399,7 @@ export default function EmitirPedido() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {/* Cabeçalho da lista */}
-              <div style={{ display: 'grid', gridTemplateColumns: '56px 1fr 70px 110px 110px 36px', gap: 8, padding: '0 6px 4px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '56px 1fr 70px 110px 110px 76px', gap: 8, padding: '0 6px 4px' }}>
                 {['Cód.', 'Produto', 'Qtd.', 'Vr. Unit.', 'Vr. Total', ''].map(h => (
                   <div key={h} style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5 }}>{h}</div>
                 ))}
@@ -389,7 +407,7 @@ export default function EmitirPedido() {
 
               {itens.map((item, i) => (
                 <div key={i} style={{
-                  display: 'grid', gridTemplateColumns: '56px 1fr 70px 110px 110px 36px',
+                  display: 'grid', gridTemplateColumns: '56px 1fr 70px 110px 110px 76px',
                   gap: 8, alignItems: 'center',
                   background: '#F8FAFC', borderRadius: 10, padding: '10px 6px',
                   border: '1px solid #E5E7EB',
@@ -406,16 +424,31 @@ export default function EmitirPedido() {
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#1F2937', textAlign: 'center' }}>{item.quantidade}</div>
                   <div style={{ fontSize: 13, color: '#6B7280', textAlign: 'right' }}>R$ {fmtBRL(item.vrUnitario)}</div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#1B6E3C', textAlign: 'right' }}>R$ {fmtBRL(item.vrTotal)}</div>
-                  <button
-                    type="button"
-                    onClick={() => removeItem(i)}
-                    style={{
-                      width: 32, height: 32, borderRadius: 8,
-                      border: '1px solid #FECACA', background: '#FEF2F2',
-                      color: '#DC2626', cursor: 'pointer', fontSize: 16,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}
-                  >×</button>
+                  {/* Botões editar + remover */}
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      type="button"
+                      onClick={() => abrirEdicao(i)}
+                      title="Editar item"
+                      style={{
+                        width: 32, height: 32, borderRadius: 8,
+                        border: '1px solid #BFDBFE', background: '#EFF6FF',
+                        color: '#2563EB', cursor: 'pointer', fontSize: 14,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >✏️</button>
+                    <button
+                      type="button"
+                      onClick={() => removeItem(i)}
+                      title="Remover item"
+                      style={{
+                        width: 32, height: 32, borderRadius: 8,
+                        border: '1px solid #FECACA', background: '#FEF2F2',
+                        color: '#DC2626', cursor: 'pointer', fontSize: 16,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >×</button>
+                  </div>
                 </div>
               ))}
             </div>
