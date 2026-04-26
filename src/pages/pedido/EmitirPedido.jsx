@@ -1,20 +1,186 @@
 import { useState, useEffect, useRef } from 'react'
-import { getClientes, getProdutos, getProdutoByCodigo, savePedido } from '../../utils/storage'
+import { getClientes, getProdutos, savePedido } from '../../utils/storage'
 import { gerarPedidoPDF } from '../../utils/pdf'
 
-const EMPTY_ITEM = { codigo: '', nome: '', quantidade: '', vrUnitario: '', vrTotal: '' }
+// ── Modal de adicionar produto ───────────────────────────────
+function ModalProduto({ produtos, onAdicionar, onClose }) {
+  const [produtoSelecionado, setProdutoSelecionado] = useState(null)
+  const [quantidade, setQuantidade]                 = useState('')
+  const [observacoes, setObservacoes]               = useState('')
 
+  const fmtBRL = v => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+
+  function handleSelect(e) {
+    const codigo = e.target.value
+    const prod = produtos.find(p => p.codigo === codigo) || null
+    setProdutoSelecionado(prod)
+    setQuantidade('')
+    setObservacoes('')
+  }
+
+  function handleAdicionar() {
+    if (!produtoSelecionado) return
+    const qty = Number(quantidade)
+    if (!qty || qty < 1) { alert('Informe uma quantidade válida.'); return }
+
+    onAdicionar({
+      codigo:      produtoSelecionado.codigo,
+      nome:        produtoSelecionado.nome,
+      quantidade:  String(qty),
+      vrUnitario:  String(produtoSelecionado.valor),
+      vrTotal:     String((qty * produtoSelecionado.valor).toFixed(2)),
+      observacoes: observacoes.trim(),
+    })
+  }
+
+  function handleOverlay(e) {
+    if (e.target === e.currentTarget) onClose()
+  }
+
+  return (
+    <div
+      onClick={handleOverlay}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,0.4)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '24px 16px',
+      }}
+    >
+      <div style={{
+        background: 'white', borderRadius: 16, width: '100%', maxWidth: 500,
+        boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+      }}>
+        {/* Cabeçalho */}
+        <div style={{
+          padding: '20px 24px 16px', borderBottom: '1px solid #F3F4F6',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <h3 style={{ fontSize: 16, fontWeight: 800, color: '#1F2937' }}>📦 Adicionar Produto</h3>
+          <button onClick={onClose} style={{
+            width: 32, height: 32, borderRadius: 8, border: '1px solid #E5E7EB',
+            background: '#F9FAFB', color: '#6B7280', cursor: 'pointer', fontSize: 18,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700,
+          }}>×</button>
+        </div>
+
+        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Select de produto */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              Código / Produto
+            </label>
+            <select
+              value={produtoSelecionado?.codigo || ''}
+              onChange={handleSelect}
+              style={{
+                width: '100%', border: '1.5px solid #D1D5DB', borderRadius: 8,
+                padding: '10px 12px', fontSize: 14, outline: 'none', background: 'white',
+                color: produtoSelecionado ? '#1F2937' : '#9CA3AF',
+              }}
+            >
+              <option value="">— Selecione um produto —</option>
+              {produtos.map(p => (
+                <option key={p.codigo} value={p.codigo}>
+                  {p.codigo} — {p.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Info do produto selecionado */}
+          {produtoSelecionado && (
+            <div style={{
+              background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 10,
+              padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#1F2937' }}>{produtoSelecionado.nome}</div>
+                <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>Código: {produtoSelecionado.codigo}</div>
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 900, color: '#1B6E3C', whiteSpace: 'nowrap' }}>
+                R$ {fmtBRL(produtoSelecionado.valor)}
+              </div>
+            </div>
+          )}
+
+          {/* Quantidade */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              Quantidade
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={quantidade}
+              onChange={e => setQuantidade(e.target.value)}
+              placeholder="0"
+              style={{
+                width: '100%', border: '1.5px solid #D1D5DB', borderRadius: 8,
+                padding: '10px 12px', fontSize: 14, outline: 'none', textAlign: 'center',
+                boxSizing: 'border-box',
+              }}
+            />
+            {produtoSelecionado && quantidade && Number(quantidade) > 0 && (
+              <div style={{ fontSize: 12, color: '#6B7280', marginTop: 6, textAlign: 'right' }}>
+                Subtotal: <strong style={{ color: '#1B6E3C' }}>
+                  R$ {fmtBRL(Number(quantidade) * produtoSelecionado.valor)}
+                </strong>
+              </div>
+            )}
+          </div>
+
+          {/* Observações do produto */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              Observações <span style={{ fontWeight: 400, textTransform: 'none', color: '#9CA3AF' }}>(personagem, cor, detalhes...)</span>
+            </label>
+            <textarea
+              value={observacoes}
+              onChange={e => setObservacoes(e.target.value)}
+              placeholder="Ex: Personagem: Stitch, Cor: Azul marinho"
+              rows={3}
+              style={{
+                width: '100%', border: '1.5px solid #D1D5DB', borderRadius: 8,
+                padding: '10px 12px', fontSize: 13, outline: 'none', resize: 'vertical',
+                fontFamily: 'inherit', lineHeight: 1.5, boxSizing: 'border-box',
+              }}
+            />
+          </div>
+
+          {/* Botão adicionar */}
+          <button
+            onClick={handleAdicionar}
+            disabled={!produtoSelecionado || !quantidade}
+            style={{
+              background: produtoSelecionado && quantidade ? '#1B6E3C' : '#D1D5DB',
+              color: 'white', border: 'none', padding: '13px', borderRadius: 10,
+              fontWeight: 800, fontSize: 15, cursor: produtoSelecionado && quantidade ? 'pointer' : 'not-allowed',
+              transition: 'background 0.2s',
+            }}
+          >
+            ＋ Adicionar ao Pedido
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Componente principal ─────────────────────────────────────
 export default function EmitirPedido() {
-  const [clientes, setClientes]             = useState([])
-  const [produtos, setProdutos]             = useState([])
-  const [clienteBusca, setClienteBusca]     = useState('')
+  const [clientes, setClientes]                     = useState([])
+  const [produtos, setProdutos]                     = useState([])
+  const [clienteBusca, setClienteBusca]             = useState('')
   const [clienteSelecionado, setClienteSelecionado] = useState(null)
-  const [clienteDropdown, setClienteDropdown] = useState(false)
-  const [itens, setItens]                   = useState([{ ...EMPTY_ITEM }])
-  const [desconto, setDesconto]             = useState('')
-  const [observacoes, setObservacoes]       = useState('Orçamento válido pelo período de 30 dias')
-  const [success, setSuccess]               = useState(false)
-  const [loading, setLoading]               = useState(true)
+  const [clienteDropdown, setClienteDropdown]       = useState(false)
+  const [itens, setItens]                           = useState([])
+  const [desconto, setDesconto]                     = useState('')
+  const [observacoes, setObservacoes]               = useState('Orçamento válido pelo período de 30 dias')
+  const [modalAberto, setModalAberto]               = useState(false)
+  const [success, setSuccess]                       = useState(false)
+  const [loading, setLoading]                       = useState(true)
   const dropdownRef = useRef(null)
 
   useEffect(() => {
@@ -25,15 +191,20 @@ export default function EmitirPedido() {
       setLoading(false)
     }
     load()
+    function handleOutside(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setClienteDropdown(false)
+    }
     document.addEventListener('mousedown', handleOutside)
     return () => document.removeEventListener('mousedown', handleOutside)
   }, [])
 
-  function handleOutside(e) {
-    if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setClienteDropdown(false)
-  }
+  // Fecha modal com ESC
+  useEffect(() => {
+    function onKey(e) { if (e.key === 'Escape') setModalAberto(false) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
 
-  // Autocomplete de cliente
   const clientesFiltrados = clientes.filter(c =>
     c.nome.toLowerCase().includes(clienteBusca.toLowerCase()) ||
     (c.cnpjCpf && c.cnpjCpf.includes(clienteBusca))
@@ -45,61 +216,32 @@ export default function EmitirPedido() {
     setClienteDropdown(false)
   }
 
-  // Quando muda código — busca produto no banco
-  async function handleCodigoChange(index, codigo) {
-    let prod = null
-    if (codigo.trim()) {
-      prod = await getProdutoByCodigo(codigo.trim())
-    }
-    setItens(prev => {
-      const updated = [...prev]
-      const qty = Number(updated[index].quantidade) || 0
-      const valor = prod ? Number(prod.valor) : 0
-      updated[index] = {
-        ...updated[index],
-        codigo,
-        nome:        prod?.nome || '',
-        vrUnitario:  prod ? String(prod.valor) : '',
-        vrTotal:     prod && qty ? String((qty * valor).toFixed(2)) : '',
-      }
-      return updated
-    })
+  function handleAdicionarItem(item) {
+    setItens(prev => [...prev, item])
+    setModalAberto(false)
   }
 
-  function handleItemChange(index, field, value) {
-    setItens(prev => {
-      const updated = [...prev]
-      updated[index] = { ...updated[index], [field]: value }
-      if (field === 'quantidade' || field === 'vrUnitario') {
-        const qty   = field === 'quantidade' ? Number(value) : Number(updated[index].quantidade)
-        const price = field === 'vrUnitario' ? Number(value) : Number(updated[index].vrUnitario)
-        if (!isNaN(qty) && !isNaN(price)) updated[index].vrTotal = String((qty * price).toFixed(2))
-      }
-      return updated
-    })
+  function removeItem(index) {
+    setItens(prev => prev.filter((_, i) => i !== index))
   }
 
-  function addItem() { setItens(prev => [...prev, { ...EMPTY_ITEM }]) }
-  function removeItem(index) { setItens(prev => prev.filter((_, i) => i !== index)) }
-
-  const totalItens  = itens.reduce((s, i) => s + (Number(i.quantidade) || 0), 0)
-  const totalValor  = itens.reduce((s, i) => s + (Number(i.vrTotal)    || 0), 0)
-  const valorFinal  = Math.max(0, totalValor - Number(desconto || 0))
-  const fmtBRL = v  => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const totalItens = itens.reduce((s, i) => s + (Number(i.quantidade) || 0), 0)
+  const totalValor = itens.reduce((s, i) => s + (Number(i.vrTotal)    || 0), 0)
+  const valorFinal = Math.max(0, totalValor - Number(desconto || 0))
+  const fmtBRL = v => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   async function handleEmitir(e) {
     e.preventDefault()
     if (!clienteSelecionado) { alert('Selecione um cliente antes de emitir.'); return }
-    const itensFilled = itens.filter(i => (i.codigo || i.nome) && i.quantidade)
-    if (!itensFilled.length) { alert('Adicione pelo menos um produto com quantidade.'); return }
+    if (!itens.length) { alert('Adicione pelo menos um produto.'); return }
 
     const pedido = {
-      cliente:     clienteSelecionado,
-      itens:       itensFilled,
-      desconto:    Number(desconto || 0),
+      cliente:    clienteSelecionado,
+      itens,
+      desconto:   Number(desconto || 0),
       valorFinal,
       observacoes,
-      data:        new Date().toISOString(),
+      data:       new Date().toISOString(),
     }
 
     await savePedido(pedido)
@@ -111,7 +253,7 @@ export default function EmitirPedido() {
   function handleLimpar() {
     if (!window.confirm('Limpar todos os dados do pedido?')) return
     setClienteBusca(''); setClienteSelecionado(null)
-    setItens([{ ...EMPTY_ITEM }]); setDesconto('')
+    setItens([]); setDesconto('')
     setObservacoes('Orçamento válido pelo período de 30 dias')
   }
 
@@ -125,6 +267,16 @@ export default function EmitirPedido() {
 
   return (
     <div style={{ maxWidth: 960, margin: '0 auto' }}>
+
+      {/* Modal */}
+      {modalAberto && (
+        <ModalProduto
+          produtos={produtos}
+          onAdicionar={handleAdicionarItem}
+          onClose={() => setModalAberto(false)}
+        />
+      )}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 800, color: '#1F2937' }}>Emitir Pedido / Orçamento</h1>
@@ -140,6 +292,7 @@ export default function EmitirPedido() {
       )}
 
       <form onSubmit={handleEmitir}>
+
         {/* ===== CLIENTE ===== */}
         <div className="ped-card" style={{ marginBottom: 20 }}>
           <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1B6E3C', marginBottom: 16 }}>👥 Dados do Cliente</h2>
@@ -200,41 +353,73 @@ export default function EmitirPedido() {
 
         {/* ===== PRODUTOS ===== */}
         <div className="ped-card" style={{ marginBottom: 20 }}>
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1B6E3C', marginBottom: 16 }}>📦 Produtos</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 90px 130px 120px 36px', gap: 8, marginBottom: 8, padding: '0 4px' }}>
-            {['Código', 'Nome do Produto', 'Qtd', 'Vr. Unitário (R$)', 'Vr. Total', ''].map(h => (
-              <div key={h} style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.5 }}>{h}</div>
-            ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1B6E3C' }}>📦 Produtos</h2>
+            <button
+              type="button"
+              onClick={() => setModalAberto(true)}
+              style={{
+                background: '#1B6E3C', color: 'white', border: 'none',
+                padding: '9px 20px', borderRadius: 9, fontWeight: 700, fontSize: 13,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
+                boxShadow: '0 2px 8px rgba(27,110,60,0.25)',
+              }}
+            >
+              ＋ Adicionar Produto
+            </button>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {itens.map((item, index) => (
-              <div key={index} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 90px 130px 120px 36px', gap: 8, alignItems: 'center' }}>
-                <input value={item.codigo} onChange={e => handleCodigoChange(index, e.target.value)}
-                  placeholder="Cód." list={`prod-list-${index}`}
-                  style={{ border: '1.5px solid #D1D5DB', borderRadius: 6, padding: '8px 10px', fontSize: 13, outline: 'none', width: '100%' }} />
-                <datalist id={`prod-list-${index}`}>
-                  {produtos.map(p => <option key={p.id} value={p.codigo}>{p.nome}</option>)}
-                </datalist>
-                <input value={item.nome} onChange={e => handleItemChange(index, 'nome', e.target.value)}
-                  placeholder="Nome do produto"
-                  style={{ border: '1.5px solid #D1D5DB', borderRadius: 6, padding: '8px 10px', fontSize: 13, outline: 'none', width: '100%' }} />
-                <input type="number" min="1" value={item.quantidade} onChange={e => handleItemChange(index, 'quantidade', e.target.value)}
-                  placeholder="0"
-                  style={{ border: '1.5px solid #D1D5DB', borderRadius: 6, padding: '8px 10px', fontSize: 13, outline: 'none', width: '100%', textAlign: 'center' }} />
-                <input type="number" step="0.01" min="0" value={item.vrUnitario} onChange={e => handleItemChange(index, 'vrUnitario', e.target.value)}
-                  placeholder="0,00"
-                  style={{ border: '1.5px solid #D1D5DB', borderRadius: 6, padding: '8px 10px', fontSize: 13, outline: 'none', width: '100%', textAlign: 'right' }} />
-                <div style={{ background: '#F3F4F6', borderRadius: 6, padding: '8px 10px', fontSize: 13, fontWeight: 600, color: '#1F2937', textAlign: 'right', border: '1px solid #E5E7EB' }}>
-                  R$ {fmtBRL(item.vrTotal)}
-                </div>
-                <button type="button" onClick={() => removeItem(index)}
-                  style={{ width: 36, height: 36, borderRadius: 8, border: '1px solid #FECACA', background: '#FEF2F2', color: '#DC2626', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>
-                  ×
-                </button>
+
+          {itens.length === 0 ? (
+            <div style={{
+              background: '#F9FAFB', border: '1px dashed #D1D5DB', borderRadius: 12,
+              padding: '36px', textAlign: 'center', color: '#9CA3AF',
+            }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📦</div>
+              <div style={{ fontSize: 14, fontWeight: 500 }}>Nenhum produto adicionado.</div>
+              <div style={{ fontSize: 13, marginTop: 4 }}>Clique em "Adicionar Produto" para começar.</div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* Cabeçalho da lista */}
+              <div style={{ display: 'grid', gridTemplateColumns: '56px 1fr 70px 110px 110px 36px', gap: 8, padding: '0 6px 4px' }}>
+                {['Cód.', 'Produto', 'Qtd.', 'Vr. Unit.', 'Vr. Total', ''].map(h => (
+                  <div key={h} style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5 }}>{h}</div>
+                ))}
               </div>
-            ))}
-          </div>
-          <button type="button" onClick={addItem} className="ped-btn-secondary" style={{ marginTop: 12 }}>+ Adicionar linha</button>
+
+              {itens.map((item, i) => (
+                <div key={i} style={{
+                  display: 'grid', gridTemplateColumns: '56px 1fr 70px 110px 110px 36px',
+                  gap: 8, alignItems: 'center',
+                  background: '#F8FAFC', borderRadius: 10, padding: '10px 6px',
+                  border: '1px solid #E5E7EB',
+                }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#6B7280' }}>{item.codigo}</div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1F2937' }}>{item.nome}</div>
+                    {item.observacoes && (
+                      <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2, fontStyle: 'italic' }}>
+                        {item.observacoes}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1F2937', textAlign: 'center' }}>{item.quantidade}</div>
+                  <div style={{ fontSize: 13, color: '#6B7280', textAlign: 'right' }}>R$ {fmtBRL(item.vrUnitario)}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1B6E3C', textAlign: 'right' }}>R$ {fmtBRL(item.vrTotal)}</div>
+                  <button
+                    type="button"
+                    onClick={() => removeItem(i)}
+                    style={{
+                      width: 32, height: 32, borderRadius: 8,
+                      border: '1px solid #FECACA', background: '#FEF2F2',
+                      color: '#DC2626', cursor: 'pointer', fontSize: 16,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >×</button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ===== TOTAIS ===== */}
@@ -242,13 +427,19 @@ export default function EmitirPedido() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 24, alignItems: 'end' }}>
             <div className="ped-form-group">
               <label>Desconto (R$)</label>
-              <input type="number" step="0.01" min="0" value={desconto} onChange={e => setDesconto(e.target.value)} placeholder="0,00"
-                style={{ border: '1.5px solid #D1D5DB', borderRadius: 6, padding: '10px 14px', fontSize: 14, outline: 'none', width: '100%' }} />
+              <input
+                type="number" step="0.01" min="0"
+                value={desconto} onChange={e => setDesconto(e.target.value)}
+                placeholder="0,00"
+                style={{ border: '1.5px solid #D1D5DB', borderRadius: 6, padding: '10px 14px', fontSize: 14, outline: 'none', width: '100%' }}
+              />
             </div>
             <div className="ped-form-group">
-              <label>Observações</label>
-              <input value={observacoes} onChange={e => setObservacoes(e.target.value)}
-                style={{ border: '1.5px solid #D1D5DB', borderRadius: 6, padding: '10px 14px', fontSize: 14, outline: 'none', width: '100%' }} />
+              <label>Observações gerais do pedido</label>
+              <input
+                value={observacoes} onChange={e => setObservacoes(e.target.value)}
+                style={{ border: '1.5px solid #D1D5DB', borderRadius: 6, padding: '10px 14px', fontSize: 14, outline: 'none', width: '100%' }}
+              />
             </div>
             <div style={{ background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 10, padding: '16px 20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 14, color: '#374151' }}>
@@ -267,7 +458,7 @@ export default function EmitirPedido() {
           </div>
         </div>
 
-        {/* BOTÃO */}
+        {/* BOTÃO EMITIR */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
           <button type="button" onClick={handleLimpar} className="ped-btn-secondary">Cancelar</button>
           <button type="submit" style={{

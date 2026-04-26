@@ -164,13 +164,19 @@ export function gerarPedidoPDF(pedido) {
     ]],
     body: [
       // itens preenchidos
-      ...itens.map(item => [
-        { content: item.codigo || '',             styles: { halign: 'center' } },
-        { content: item.nome   || '',             styles: {} },
-        { content: String(item.quantidade || ''), styles: { halign: 'center' } },
-        { content: fmtBRL(item.vrUnitario),       styles: { halign: 'right' } },
-        { content: fmtBRL(item.vrTotal),          styles: { halign: 'right' } },
-      ]),
+      ...itens.map(item => {
+        // Se tem observações, concatena abaixo do nome em linha separada
+        const nomeCompleto = item.observacoes
+          ? `${item.nome || ''}\n${item.observacoes}`
+          : (item.nome || '')
+        return [
+          { content: item.codigo || '',             styles: { halign: 'center' } },
+          { content: nomeCompleto,                  styles: { cellWidth: 'auto' } },
+          { content: String(item.quantidade || ''), styles: { halign: 'center' } },
+          { content: fmtBRL(item.vrUnitario),       styles: { halign: 'right' } },
+          { content: fmtBRL(item.vrTotal),          styles: { halign: 'right' } },
+        ]
+      }),
       // linhas em branco para parecer o modelo (mínimo 18 linhas)
       ...Array(Math.max(0, 18 - itens.length)).fill([
         { content: '' }, { content: '' }, { content: '' }, { content: '' }, { content: '' }
