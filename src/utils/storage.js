@@ -270,9 +270,27 @@ export async function updateProfile(id, updates) {
 }
 
 export async function criarColaborador({ email, password, nome, tipo }) {
-  // Usa um cliente temporário e isolado para NÃO deslogar o admin atual.
-  // persistSession: false → sessão fica só em memória, não toca o localStorage
-  // do cliente principal, portanto o onAuthStateChange do admin não é disparado.
+  // 1. Verifica se já existe um profile com esse email (ativo ou desativado)
+  //    Isso evita tentar criar um usuário que já existe no auth.users
+  const { data: existing } = await supabase
+    .from('profiles')
+    .select('id, ativo')
+    .eq('email', email)
+    .maybeSingle()
+
+  if (existing) {
+    // Usuário já existe: apenas reativa e atualiza dados (sem novo signUp)
+    const { error } = await supabase
+      .from('profiles')
+      .update({ nome, tipo, ativo: true })
+      .eq('id', existing.id)
+    if (error) throw new Error(error.message)
+    return { reativado: true, user: { id: existing.id } }
+  }
+
+  // 2. Usuário novo: usa cliente temporário para NÃO deslogar o admin atual.
+  //    persistSession: false → sessão fica só em memória, não toca o localStorage
+  //    do cliente principal, portanto o onAuthStateChange do admin não dispara.
   const tempClient = createClient(
     import.meta.env.VITE_SUPABASE_URL,
     import.meta.env.VITE_SUPABASE_ANON_KEY,
@@ -292,7 +310,8 @@ export async function criarColaborador({ email, password, nome, tipo }) {
 }
 
 export async function deleteColaborador(id) {
-  // Chama função SQL com SECURITY DEFINER que verifica se o caller é admin
+  // Soft delete via função SQL com SECURITY DEFINER (apenas admin pode chamar)
+  // Define ativo = false em vez de excluir — evita problemas de "already registered"
   const { error } = await supabase.rpc('excluir_colaborador', { profile_id: id })
   check(error, 'deleteColaborador')
 }

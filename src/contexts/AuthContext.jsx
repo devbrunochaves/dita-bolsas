@@ -24,31 +24,42 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true
 
-    // 1. Lê a sessão atual do localStorage (confiável no F5 e recargas)
-    //    getSession() não faz chamada de rede para leitura — usa storage local
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!mounted) return
-      const u = session?.user ?? null
-      if (u) {
-        const p = await fetchProfile(u.id)
-        if (mounted) { setUser(u); setProfile(p) }
-      }
+    // Safety timeout: garante que o loading some em até 6s, mesmo se getSession travar
+    const safetyTimeout = setTimeout(() => {
       if (mounted) setLoading(false)
-    })
+    }, 6000)
 
-    // 2. Escuta mudanças subsequentes (login, logout, token refresh)
-    //    INITIAL_SESSION é ignorado — já tratado pelo getSession() acima
+    // Inicializa com sessão do localStorage (pode fazer refresh de token via rede)
+    async function init() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!mounted) return
+        const u = session?.user ?? null
+        if (u) {
+          const p = await fetchProfile(u.id)
+          if (mounted) { setUser(u); setProfile(p) }
+        }
+      } catch {
+        // silencia erros — o finally garante que o loading é removido
+      } finally {
+        clearTimeout(safetyTimeout)
+        if (mounted) setLoading(false)
+      }
+    }
+
+    init()
+
+    // Escuta mudanças subsequentes (login, logout, token refresh)
+    // INITIAL_SESSION é ignorado — já tratado pelo init() acima
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === 'INITIAL_SESSION') return
 
         const u = session?.user ?? null
-
         if (!u) {
           if (mounted) { setUser(null); setProfile(null) }
           return
         }
-
         const p = await fetchProfile(u.id)
         if (mounted) { setUser(u); setProfile(p) }
       }
@@ -56,6 +67,7 @@ export function AuthProvider({ children }) {
 
     return () => {
       mounted = false
+      clearTimeout(safetyTimeout)
       subscription.unsubscribe()
     }
   }, [])
@@ -63,12 +75,10 @@ export function AuthProvider({ children }) {
   async function signIn(email, password) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw new Error(error.message)
-    // SIGNED_IN dispara onAuthStateChange → atualiza user + profile
   }
 
   async function signOut() {
     await supabase.auth.signOut()
-    // SIGNED_OUT dispara onAuthStateChange → limpa user + profile
   }
 
   const isAdmin = profile?.tipo === 'admin'

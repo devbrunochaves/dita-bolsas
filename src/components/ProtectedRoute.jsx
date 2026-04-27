@@ -26,8 +26,11 @@ export default function ProtectedRoute({ children, adminOnly = false }) {
   // Não logado → login
   if (!user) return <Navigate to="/login" replace />
 
+  // Sem profile ou colaborador desativado → login
+  if (!profile || profile.ativo === false) return <Navigate to="/login" replace />
+
   // Rota exclusiva de admin → acesso negado
-  if (adminOnly && profile?.tipo !== 'admin') {
+  if (adminOnly && profile.tipo !== 'admin') {
     return <Navigate to="/pedido" replace />
   }
 
