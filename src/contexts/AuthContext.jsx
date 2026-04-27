@@ -10,8 +10,13 @@ async function fetchProfile(userId) {
       .select('*')
       .eq('id', userId)
       .single()
-    return (!error && data) ? data : null
-  } catch {
+    if (error) {
+      console.warn('[Auth] fetchProfile erro:', error.message, '| code:', error.code)
+      return null
+    }
+    return data || null
+  } catch (e) {
+    console.warn('[Auth] fetchProfile exception:', e)
     return null
   }
 }
@@ -24,44 +29,31 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true
 
-    // Safety timeout: garante que o loading some em até 6s, mesmo se getSession travar
+    // Safety timeout: garante que o loading some em até 8s no pior caso
     const safetyTimeout = setTimeout(() => {
       if (mounted) setLoading(false)
-    }, 6000)
+    }, 8000)
 
-    // Inicializa com sessão do localStorage (pode fazer refresh de token via rede)
-    async function init() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!mounted) return
-        const u = session?.user ?? null
-        if (u) {
-          const p = await fetchProfile(u.id)
-          if (mounted) { setUser(u); setProfile(p) }
-        }
-      } catch {
-        // silencia erros — o finally garante que o loading é removido
-      } finally {
-        clearTimeout(safetyTimeout)
-        if (mounted) setLoading(false)
-      }
-    }
-
-    init()
-
-    // Escuta mudanças subsequentes (login, logout, token refresh)
-    // INITIAL_SESSION é ignorado — já tratado pelo init() acima
+    // onAuthStateChange é a fonte de verdade — inclui INITIAL_SESSION
+    // que no Supabase v2 dispara imediatamente com a sessão do localStorage
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === 'INITIAL_SESSION') return
+        if (!mounted) return
 
         const u = session?.user ?? null
+
         if (!u) {
-          if (mounted) { setUser(null); setProfile(null) }
+          clearTimeout(safetyTimeout)
+          if (mounted) { setUser(null); setProfile(null); setLoading(false) }
           return
         }
+
         const p = await fetchProfile(u.id)
-        if (mounted) { setUser(u); setProfile(p) }
+        if (!mounted) return
+        clearTimeout(safetyTimeout)
+        setUser(u)
+        setProfile(p)
+        setLoading(false)
       }
     )
 
@@ -73,8 +65,20 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function signIn(email, password) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw new Error(error.message)
+
+    // Verifica imediatamente se a conta está desativada
+    const { data: p } = await supabase
+      .from('profiles')
+      .select('ativo')
+      .eq('id', data.user.id)
+      .maybeSingle()
+
+    if (p?.ativo === false) {
+      await supabase.auth.signOut()
+      throw new Error('Sua conta foi desativada. Entre em contato com o administrador.')
+    }
   }
 
   async function signOut() {

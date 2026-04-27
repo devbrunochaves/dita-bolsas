@@ -3,26 +3,18 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function Login() {
-  const { user, profile, signIn, signOut } = useAuth()
-  const navigate                   = useNavigate()
+  const { user, signIn } = useAuth()
+  const navigate         = useNavigate()
 
   const [email, setEmail]       = useState('')
   const [senha, setSenha]       = useState('')
   const [erro, setErro]         = useState('')
   const [loading, setLoading]   = useState(false)
 
-  // Quando user + profile carregarem, verificar se conta está ativa
+  // Navega assim que o user for definido no contexto
   useEffect(() => {
-    if (!user) return
-    if (!profile) return // aguarda perfil carregar
-    if (profile.ativo === false) {
-      signOut()
-      setErro('Sua conta foi desativada. Entre em contato com o administrador.')
-      setLoading(false)
-    } else {
-      navigate('/pedido', { replace: true })
-    }
-  }, [user, profile])
+    if (user) navigate('/pedido', { replace: true })
+  }, [user])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -30,12 +22,12 @@ export default function Login() {
     setLoading(true)
     try {
       await signIn(email, senha)
-      // navegação feita pelo useEffect acima quando user + profile chegarem
+      // signIn já verifica conta desativada e lança erro se necessário
+      // se chegou aqui, a navegação acontece via useEffect acima
     } catch (err) {
       setErro(err.message || 'Email ou senha incorretos.')
       setLoading(false)
     }
-    // loading fica true até o useEffect navegar (ou detectar conta inativa)
   }
 
   return (
