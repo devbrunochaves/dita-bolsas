@@ -1,15 +1,20 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function Login() {
-  const { signIn } = useAuth()
-  const navigate   = useNavigate()
+  const { user, signIn } = useAuth()
+  const navigate         = useNavigate()
 
   const [email, setEmail]       = useState('')
   const [senha, setSenha]       = useState('')
   const [erro, setErro]         = useState('')
   const [loading, setLoading]   = useState(false)
+
+  // Navega ao /pedido assim que o user for setado (cobre o delay do onAuthStateChange)
+  useEffect(() => {
+    if (user) navigate('/pedido', { replace: true })
+  }, [user])
 
   async function handleSubmit(e) {
     e.preventDefault()

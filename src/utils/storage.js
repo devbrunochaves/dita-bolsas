@@ -3,6 +3,7 @@
 //  Todas as funções são async e retornam os dados direto.
 // ============================================================
 
+import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 
 // helper: lança erro visível no console
@@ -269,21 +270,31 @@ export async function updateProfile(id, updates) {
 }
 
 export async function criarColaborador({ email, password, nome, tipo }) {
-  const { data, error } = await supabase.auth.signUp({
+  // Usa um cliente temporário e isolado para NÃO deslogar o admin atual.
+  // persistSession: false → sessão fica só em memória, não toca o localStorage
+  // do cliente principal, portanto o onAuthStateChange do admin não é disparado.
+  const tempClient = createClient(
+    import.meta.env.VITE_SUPABASE_URL,
+    import.meta.env.VITE_SUPABASE_ANON_KEY,
+    { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
+  )
+
+  const { data, error } = await tempClient.auth.signUp({
     email,
     password,
     options: { data: { nome, tipo } },
   })
   if (error) throw new Error(error.message)
 
-  // Garante que o profile existe com tipo correto
-  if (data.user?.id) {
-    await supabase.from('profiles').upsert(
-      { id: data.user.id, nome, email, tipo },
-      { onConflict: 'id' }
-    )
-  }
+  // O trigger handle_new_user cria o profile automaticamente com nome e tipo
+  // vindos de raw_user_meta_data. Nenhuma ação adicional necessária aqui.
   return data
+}
+
+export async function deleteColaborador(id) {
+  // Chama função SQL com SECURITY DEFINER que verifica se o caller é admin
+  const { error } = await supabase.rpc('excluir_colaborador', { profile_id: id })
+  check(error, 'deleteColaborador')
 }
 
 // ============================================================

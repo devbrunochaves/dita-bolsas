@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getProfiles, updateProfile, criarColaborador } from '../../utils/storage'
+import { getProfiles, updateProfile, criarColaborador, deleteColaborador } from '../../utils/storage'
 import { useAuth } from '../../contexts/AuthContext'
 
 const TIPO_CONFIG = {
@@ -78,7 +78,7 @@ function ModalCriar({ onClose, onCriado }) {
           )}
 
           <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400E' }}>
-            ℹ️ O colaborador receberá um email de confirmação. Se não chegar, verifique as configurações de <strong>Email</strong> no Supabase.
+            ℹ️ O colaborador poderá fazer login imediatamente com a senha definida acima.
           </div>
 
           <button type="submit" disabled={loading} style={{
@@ -165,12 +165,74 @@ function ModalEditar({ colaborador, onClose, onSalvo }) {
   )
 }
 
+// ── Modal confirmar exclusão ─────────────────────────────────
+function ModalExcluir({ colaborador, onClose, onExcluido }) {
+  const [loading, setLoading] = useState(false)
+  const [erro, setErro]       = useState('')
+
+  async function handleConfirmar() {
+    setLoading(true)
+    try {
+      await deleteColaborador(colaborador.id)
+      onExcluido()
+      onClose()
+    } catch (err) {
+      setErro(err.message || 'Erro ao excluir colaborador.')
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div onClick={e => e.target === e.currentTarget && onClose()} style={{
+      position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.4)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px',
+    }}>
+      <div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+        <div style={{ padding: '24px 24px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🗑️</div>
+            <h3 style={{ fontSize: 17, fontWeight: 800, color: '#1F2937', marginBottom: 6 }}>Excluir Colaborador</h3>
+            <p style={{ fontSize: 14, color: '#6B7280', lineHeight: 1.5 }}>
+              Tem certeza que deseja excluir <strong style={{ color: '#1F2937' }}>{colaborador.nome || colaborador.email}</strong>?
+              <br />
+              <span style={{ fontSize: 13 }}>Esta ação remove o acesso ao sistema.</span>
+            </p>
+          </div>
+
+          {erro && (
+            <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#DC2626' }}>
+              ⚠️ {erro}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={onClose} style={{
+              flex: 1, padding: '11px', borderRadius: 10, border: '1.5px solid #E5E7EB',
+              background: 'white', color: '#374151', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+            }}>
+              Cancelar
+            </button>
+            <button onClick={handleConfirmar} disabled={loading} style={{
+              flex: 1, padding: '11px', borderRadius: 10, border: 'none',
+              background: loading ? '#9CA3AF' : '#DC2626', color: 'white',
+              fontWeight: 700, fontSize: 14, cursor: loading ? 'not-allowed' : 'pointer',
+            }}>
+              {loading ? 'Excluindo...' : 'Sim, excluir'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Página principal ─────────────────────────────────────────
 export default function Colaboradores() {
   const [profiles, setProfiles]     = useState([])
   const [loading, setLoading]       = useState(true)
   const [modalCriar, setModalCriar] = useState(false)
   const [editando, setEditando]     = useState(null)
+  const [excluindo, setExcluindo]   = useState(null)
   const { profile: meProfile }      = useAuth()
 
   async function carregar() {
@@ -192,6 +254,9 @@ export default function Colaboradores() {
       )}
       {editando && (
         <ModalEditar colaborador={editando} onClose={() => setEditando(null)} onSalvo={carregar} />
+      )}
+      {excluindo && (
+        <ModalExcluir colaborador={excluindo} onClose={() => setExcluindo(null)} onExcluido={carregar} />
       )}
 
       {/* Cabeçalho */}
@@ -217,10 +282,10 @@ export default function Colaboradores() {
         </div>
       ) : (
         <div style={{ background: 'white', borderRadius: 14, border: '1px solid #E5E7EB', overflow: 'auto', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #E5E7EB' }}>
-                {['Nome', 'Email', 'Tipo', 'Desde', ''].map(h => (
+                {['Nome', 'Email', 'Tipo', 'Desde', 'Ações'].map(h => (
                   <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.5 }}>{h}</th>
                 ))}
               </tr>
@@ -248,12 +313,22 @@ export default function Colaboradores() {
                       {p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '—'}
                     </td>
                     <td style={{ padding: '14px 16px' }}>
-                      <button
-                        onClick={() => setEditando(p)}
-                        style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #E5E7EB', background: '#F9FAFB', color: '#374151', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
-                      >
-                        ✏️ Editar
-                      </button>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          onClick={() => setEditando(p)}
+                          style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #E5E7EB', background: '#F9FAFB', color: '#374151', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+                        >
+                          ✏️ Editar
+                        </button>
+                        {!ehEu && (
+                          <button
+                            onClick={() => setExcluindo(p)}
+                            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #FECACA', background: '#FEF2F2', color: '#DC2626', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+                          >
+                            🗑️ Excluir
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )

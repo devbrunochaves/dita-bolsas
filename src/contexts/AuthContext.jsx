@@ -1,66 +1,61 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
+
+async function fetchProfile(userId) {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single()
+    return (!error && data) ? data : null
+  } catch {
+    return null
+  }
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser]       = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
-  const resolvedRef = useRef(false) // garante que setLoading(false) roda só uma vez
-
-  function done(u, p) {
-    if (resolvedRef.current) return
-    resolvedRef.current = true
-    setUser(u)
-    setProfile(p)
-    setLoading(false)
-  }
 
   useEffect(() => {
-    // Timeout de segurança: libera o loading após 6s no pior caso
-    const timeout = setTimeout(() => {
-      if (!resolvedRef.current) {
-        console.warn('[Auth] Timeout — liberando loading sem sessão')
-        done(null, null)
-      }
-    }, 6000)
+    let mounted = true
 
-    // onAuthStateChange é a fonte principal no Supabase v2
-    // Dispara INITIAL_SESSION imediatamente se houver sessão salva
+    // 1. Lê a sessão atual do localStorage (confiável no F5 e recargas)
+    //    getSession() não faz chamada de rede para leitura — usa storage local
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!mounted) return
+      const u = session?.user ?? null
+      if (u) {
+        const p = await fetchProfile(u.id)
+        if (mounted) { setUser(u); setProfile(p) }
+      }
+      if (mounted) setLoading(false)
+    })
+
+    // 2. Escuta mudanças subsequentes (login, logout, token refresh)
+    //    INITIAL_SESSION é ignorado — já tratado pelo getSession() acima
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (event === 'INITIAL_SESSION') return
+
         const u = session?.user ?? null
 
         if (!u) {
-          done(null, null)
+          if (mounted) { setUser(null); setProfile(null) }
           return
         }
 
-        // Busca profile
-        try {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', u.id)
-            .single()
-
-          const p = (!error && data) ? data : null
-          done(u, p)
-
-          // Atualiza sem travar se já resolveu
-          if (resolvedRef.current) {
-            setUser(u)
-            setProfile(p)
-          }
-        } catch {
-          done(u, null)
-        }
+        const p = await fetchProfile(u.id)
+        if (mounted) { setUser(u); setProfile(p) }
       }
     )
 
     return () => {
-      clearTimeout(timeout)
+      mounted = false
       subscription.unsubscribe()
     }
   }, [])
@@ -68,16 +63,12 @@ export function AuthProvider({ children }) {
   async function signIn(email, password) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw new Error(error.message)
-    // onAuthStateChange vai atualizar user + profile automaticamente
+    // SIGNED_IN dispara onAuthStateChange → atualiza user + profile
   }
 
   async function signOut() {
-    resolvedRef.current = false
-    setLoading(true)
     await supabase.auth.signOut()
-    setUser(null)
-    setProfile(null)
-    setLoading(false)
+    // SIGNED_OUT dispara onAuthStateChange → limpa user + profile
   }
 
   const isAdmin = profile?.tipo === 'admin'
