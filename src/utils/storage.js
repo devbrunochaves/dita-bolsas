@@ -14,6 +14,20 @@ function check(error, context) {
   }
 }
 
+// helper interno: registra uma ação no histórico do pedido (fire-and-forget)
+async function logHistorico(pedidoId, acao, userId, userName) {
+  try {
+    await supabase.from('pedido_historico').insert({
+      pedido_id: pedidoId,
+      user_id:   userId  || null,
+      user_nome: userName || 'Sistema',
+      acao,
+    })
+  } catch {
+    // histórico não é crítico — silencia erros
+  }
+}
+
 // ============================================================
 //  CLIENTES
 // ============================================================
@@ -216,6 +230,10 @@ export async function savePedido(pedido) {
     .select()
     .single()
   check(error, 'savePedido')
+
+  // Registra criação no histórico
+  logHistorico(data.id, 'Pedido criado', user?.id, nomeEmitente)
+
   return mapPedido(data)
 }
 
@@ -230,6 +248,28 @@ export async function updatePedidoStatus(id, status) {
     .update({ status })
     .eq('id', id)
   check(error, 'updatePedidoStatus')
+
+  // Registra mudança de status no histórico
+  const STATUS_LABEL = { PENDENTE: 'Pendente', ENTREGUE: 'Entregue', CANCELADO: 'Cancelado' }
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: prof }     = await supabase.from('profiles').select('nome').eq('id', user?.id).single()
+    logHistorico(id, `Status alterado para ${STATUS_LABEL[status] || status}`, user?.id, prof?.nome || user?.email)
+  } catch {
+    logHistorico(id, `Status alterado para ${STATUS_LABEL[status] || status}`)
+  }
+}
+
+// ── Histórico ──────────────────────────────────────────────
+
+export async function getPedidoHistorico(pedidoId) {
+  const { data, error } = await supabase
+    .from('pedido_historico')
+    .select('*')
+    .eq('pedido_id', pedidoId)
+    .order('created_at', { ascending: true })
+  check(error, 'getPedidoHistorico')
+  return data || []
 }
 
 function mapPedido(r) {

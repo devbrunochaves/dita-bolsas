@@ -1,221 +1,405 @@
 import { useEffect, useState, useCallback } from 'react'
-import { getPedidos } from '../../utils/storage'
+import { getPedidos, deletePedido, getPedidoHistorico } from '../../utils/storage'
+import { useAuth } from '../../contexts/AuthContext'
 import { StatusSelect, StatusBadge, STATUS_CONFIG, STATUS_LIST } from '../../components/StatusSelect'
 import { gerarPedidoPDF } from '../../utils/pdf'
 
+// ── Painel de histórico ──────────────────────────────────────
+function HistoricoPanel({ pedidoId, onClose }) {
+  const [itens,   setItens]   = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    getPedidoHistorico(pedidoId)
+      .then(data => { setItens(data); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [pedidoId])
+
+  function iconeAcao(acao) {
+    if (acao.includes('criado'))  return '🆕'
+    if (acao.includes('Status'))  return '🔄'
+    if (acao.includes('Entregue')) return '✅'
+    if (acao.includes('Cancelado')) return '❌'
+    return '📌'
+  }
+
+  return (
+    <div onClick={e => e.target === e.currentTarget && onClose()} style={{
+      position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px',
+    }}>
+      <div style={{
+        background: 'white', borderRadius: 18, width: '100%', maxWidth: 520,
+        maxHeight: '80vh', display: 'flex', flexDirection: 'column',
+        boxShadow: '0 24px 80px rgba(0,0,0,0.3)',
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: '18px 24px 14px', borderBottom: '1px solid #F3F4F6',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <div>
+            <h3 style={{ fontSize: 15, fontWeight: 800, color: '#1F2937', margin: 0 }}>📋 Histórico do Pedido</h3>
+            <p style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>Todas as atualizações realizadas</p>
+          </div>
+          <button onClick={onClose} style={{
+            width: 32, height: 32, borderRadius: 8, border: '1px solid #E5E7EB',
+            background: '#F9FAFB', color: '#6B7280', cursor: 'pointer', fontSize: 18,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700,
+          }}>×</button>
+        </div>
+
+        {/* Timeline */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+          {loading ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, gap: 12 }}>
+              <div style={{ width: 24, height: 24, border: '3px solid #E5E7EB', borderTopColor: '#DC2626', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+              <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+              <span style={{ color: '#9CA3AF', fontSize: 13 }}>Carregando...</span>
+            </div>
+          ) : itens.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 0' }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>📭</div>
+              <p style={{ color: '#9CA3AF', fontSize: 14 }}>Nenhum histórico registrado ainda.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {itens.map((item, idx) => (
+                <div key={item.id} style={{ display: 'flex', gap: 14, position: 'relative' }}>
+                  {/* Linha vertical da timeline */}
+                  {idx < itens.length - 1 && (
+                    <div style={{
+                      position: 'absolute', left: 19, top: 38, bottom: 0,
+                      width: 2, background: '#F3F4F6',
+                    }} />
+                  )}
+                  {/* Ícone */}
+                  <div style={{
+                    width: 38, height: 38, borderRadius: '50%', background: '#FEF2F2',
+                    border: '2px solid #FECACA', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', fontSize: 16, flexShrink: 0, zIndex: 1,
+                  }}>
+                    {iconeAcao(item.acao)}
+                  </div>
+                  {/* Conteúdo */}
+                  <div style={{ paddingBottom: 20, flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#1F2937' }}>{item.acao}</div>
+                    <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
+                      por <strong>{item.user_nome}</strong>
+                    </div>
+                    <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 3 }}>
+                      {new Date(item.created_at).toLocaleString('pt-BR')}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Modal de confirmação de exclusão ─────────────────────────
+function ModalExcluirPedido({ pedido, onClose, onConfirm }) {
+  const [loading, setLoading] = useState(false)
+
+  async function handleConfirmar() {
+    setLoading(true)
+    await onConfirm()
+    setLoading(false)
+  }
+
+  return (
+    <div onClick={e => e.target === e.currentTarget && onClose()} style={{
+      position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px',
+    }}>
+      <div style={{
+        background: 'white', borderRadius: 18, width: '100%', maxWidth: 420,
+        boxShadow: '0 24px 80px rgba(0,0,0,0.3)', padding: '28px 28px 24px',
+        display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'center',
+      }}>
+        <div style={{ fontSize: 44 }}>🗑️</div>
+        <div>
+          <h3 style={{ fontSize: 17, fontWeight: 800, color: '#1F2937', marginBottom: 6 }}>Excluir Pedido #{pedido.numero}?</h3>
+          <p style={{ fontSize: 14, color: '#6B7280', lineHeight: 1.5 }}>
+            Esta ação é <strong>permanente</strong> e não pode ser desfeita.<br />
+            O histórico do pedido também será removido.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+          <button onClick={onClose} style={{
+            flex: 1, padding: '12px', borderRadius: 10, border: '1.5px solid #E5E7EB',
+            background: 'white', color: '#374151', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+          }}>
+            Cancelar
+          </button>
+          <button onClick={handleConfirmar} disabled={loading} style={{
+            flex: 1, padding: '12px', borderRadius: 10, border: 'none',
+            background: loading ? '#9CA3AF' : '#DC2626', color: 'white',
+            fontWeight: 700, fontSize: 14, cursor: loading ? 'not-allowed' : 'pointer',
+          }}>
+            {loading ? 'Excluindo...' : 'Sim, excluir'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Modal de detalhes do pedido ──────────────────────────────
-function PedidoModal({ pedido, onClose, onStatusChange }) {
+function PedidoModal({ pedido, isAdmin, onClose, onStatusChange, onDelete }) {
+  const [verHistorico,   setVerHistorico]   = useState(false)
+  const [confirmarExcl,  setConfirmarExcl]  = useState(false)
+
   if (!pedido) return null
 
   const fmtBRL = v => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   const totalQtd   = pedido.itens?.reduce((s, i) => s + (Number(i.quantidade) || 0), 0) || 0
   const totalValor = pedido.itens?.reduce((s, i) => s + (Number(i.vrTotal)    || 0), 0) || 0
-
-  const cliente = pedido.cliente || {}
-
-  function handleDownload() {
-    gerarPedidoPDF({ ...pedido, data: pedido.dataCriacao })
-  }
-
-  function handleOverlayClick(e) {
-    if (e.target === e.currentTarget) onClose()
-  }
+  const cliente    = pedido.cliente || {}
 
   return (
-    <div
-      onClick={handleOverlayClick}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 1000,
-        background: 'rgba(0,0,0,0.45)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '24px 16px',
-      }}
-    >
-      <div style={{
-        background: 'white', borderRadius: 18, width: '100%', maxWidth: 760,
-        maxHeight: '90vh', overflowY: 'auto',
-        boxShadow: '0 24px 80px rgba(0,0,0,0.25)',
-        display: 'flex', flexDirection: 'column',
-      }}>
+    <>
+      {verHistorico  && <HistoricoPanel pedidoId={pedido.id} onClose={() => setVerHistorico(false)} />}
+      {confirmarExcl && (
+        <ModalExcluirPedido
+          pedido={pedido}
+          onClose={() => setConfirmarExcl(false)}
+          onConfirm={async () => { await onDelete(pedido.id); setConfirmarExcl(false); onClose() }}
+        />
+      )}
 
-        {/* ── Cabeçalho do modal ── */}
+      <div
+        onClick={e => e.target === e.currentTarget && onClose()}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(0,0,0,0.45)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '24px 16px',
+        }}
+      >
         <div style={{
-          padding: '20px 28px 16px', borderBottom: '1px solid #F3F4F6',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          position: 'sticky', top: 0, background: 'white', zIndex: 1,
-          borderRadius: '18px 18px 0 0',
+          background: 'white', borderRadius: 18, width: '100%', maxWidth: 760,
+          maxHeight: '90vh', overflowY: 'auto',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.25)',
+          display: 'flex', flexDirection: 'column',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 22, fontWeight: 900, color: '#1B6E3C' }}>#{pedido.numero || '-'}</span>
-            <StatusBadge status={pedido.status || 'PENDENTE'} />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <button
-              onClick={handleDownload}
-              style={{
-                background: '#1B6E3C', color: 'white', border: 'none',
-                padding: '9px 20px', borderRadius: 9, fontWeight: 700, fontSize: 13,
-                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7,
-                boxShadow: '0 2px 8px rgba(27,110,60,0.3)',
-              }}
-            >
-              📥 Baixar PDF
-            </button>
-            <button
-              onClick={onClose}
-              style={{
-                width: 36, height: 36, borderRadius: 9, border: '1px solid #E5E7EB',
-                background: '#F9FAFB', color: '#6B7280', cursor: 'pointer',
-                fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 700,
-              }}
-            >
-              ×
-            </button>
-          </div>
-        </div>
 
-        <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 24 }}>
-
-          {/* ── Dados do cliente ── */}
-          <section>
-            <h3 style={{ fontSize: 12, fontWeight: 700, color: '#1B6E3C', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.8 }}>
-              👥 Dados do Cliente
-            </h3>
-            <div style={{
-              background: '#F8FAFC', border: '1px solid #E5E7EB', borderRadius: 12,
-              padding: '16px 20px',
-              display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
-              gap: '12px 24px', fontSize: 13,
-            }}>
-              {[
-                ['Nome',        cliente.nome      || '—'],
-                ['CNPJ/CPF',    cliente.cnpjCpf   || '—'],
-                ['Endereço',    cliente.endereco  || '—'],
-                ['Bairro',      cliente.bairro    || '—'],
-                ['Cidade / UF', `${cliente.cidade || '—'} / ${cliente.estado || '—'}`],
-                ['Telefone',    cliente.telefone  || '—'],
-                ['WhatsApp',    cliente.whatsapp  || '—'],
-                ['Contato',     cliente.contato   || '—'],
-                ['Email',       cliente.email     || '—'],
-                ['Pagamento',   cliente.pgt       || '—'],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <div style={{ color: '#9CA3AF', fontWeight: 600, fontSize: 11, marginBottom: 3 }}>{label}</div>
-                  <div style={{ color: '#1F2937', fontWeight: 500 }}>{value}</div>
-                </div>
-              ))}
+          {/* ── Cabeçalho do modal ── */}
+          <div style={{
+            padding: '20px 28px 16px', borderBottom: '1px solid #F3F4F6',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            position: 'sticky', top: 0, background: 'white', zIndex: 1,
+            borderRadius: '18px 18px 0 0', flexWrap: 'wrap', gap: 10,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 22, fontWeight: 900, color: '#1B6E3C' }}>#{pedido.numero || '-'}</span>
+              <StatusBadge status={pedido.status || 'PENDENTE'} />
             </div>
-          </section>
-
-          {/* ── Itens do pedido ── */}
-          <section>
-            <h3 style={{ fontSize: 12, fontWeight: 700, color: '#1B6E3C', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.8 }}>
-              📦 Itens do Pedido
-            </h3>
-            <div style={{ border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                <thead>
-                  <tr style={{ background: '#F8FAFC' }}>
-                    {['Cód.', 'Produto', 'Qtd.', 'Vr. Unitário', 'Vr. Total'].map((h, i) => (
-                      <th key={h} style={{
-                        padding: '10px 14px', fontWeight: 700, fontSize: 11,
-                        color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.5,
-                        textAlign: i >= 2 ? 'right' : 'left',
-                        borderBottom: '1px solid #E5E7EB',
-                      }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {(pedido.itens || []).map((item, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid #F3F4F6' }}>
-                      <td style={{ padding: '10px 14px', color: '#6B7280', fontWeight: 600 }}>{item.codigo || '—'}</td>
-                      <td style={{ padding: '10px 14px', color: '#1F2937' }}>{item.nome || '—'}</td>
-                      <td style={{ padding: '10px 14px', color: '#1F2937', fontWeight: 600, textAlign: 'right' }}>{item.quantidade || 0}</td>
-                      <td style={{ padding: '10px 14px', color: '#1F2937', textAlign: 'right' }}>R$ {fmtBRL(item.vrUnitario)}</td>
-                      <td style={{ padding: '10px 14px', color: '#1F2937', fontWeight: 700, textAlign: 'right' }}>R$ {fmtBRL(item.vrTotal)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          {/* ── Totais ── */}
-          <section>
-            <div style={{
-              background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 12,
-              padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 8,
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151' }}>
-                <span>Total de itens</span>
-                <strong>{totalQtd} unid.</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151' }}>
-                <span>Subtotal</span>
-                <strong>R$ {fmtBRL(totalValor)}</strong>
-              </div>
-              {Number(pedido.desconto) > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#DC2626' }}>
-                  <span>Desconto</span>
-                  <strong>− R$ {fmtBRL(pedido.desconto)}</strong>
-                </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {/* Botão Histórico */}
+              <button
+                onClick={() => setVerHistorico(true)}
+                style={{
+                  background: '#DC2626', color: 'white', border: 'none',
+                  padding: '9px 18px', borderRadius: 9, fontWeight: 700, fontSize: 13,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                  boxShadow: '0 2px 8px rgba(220,38,38,0.3)',
+                }}
+              >
+                📋 Histórico
+              </button>
+              {/* Botão Baixar PDF */}
+              <button
+                onClick={() => gerarPedidoPDF({ ...pedido, data: pedido.dataCriacao })}
+                style={{
+                  background: '#1B6E3C', color: 'white', border: 'none',
+                  padding: '9px 18px', borderRadius: 9, fontWeight: 700, fontSize: 13,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                  boxShadow: '0 2px 8px rgba(27,110,60,0.3)',
+                }}
+              >
+                📥 Baixar PDF
+              </button>
+              {/* Botão Excluir (admin only) */}
+              {isAdmin && (
+                <button
+                  onClick={() => setConfirmarExcl(true)}
+                  title="Excluir pedido"
+                  style={{
+                    width: 36, height: 36, borderRadius: 9, border: '1px solid #FECACA',
+                    background: '#FEF2F2', color: '#DC2626', cursor: 'pointer',
+                    fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  🗑️
+                </button>
               )}
-              <div style={{
-                display: 'flex', justifyContent: 'space-between',
-                paddingTop: 10, borderTop: '1px solid #86EFAC',
-                fontSize: 17, fontWeight: 900, color: '#1B6E3C',
-              }}>
-                <span>Valor Final</span>
-                <span>R$ {fmtBRL(pedido.valorFinal)}</span>
-              </div>
+              {/* Fechar */}
+              <button
+                onClick={onClose}
+                style={{
+                  width: 36, height: 36, borderRadius: 9, border: '1px solid #E5E7EB',
+                  background: '#F9FAFB', color: '#6B7280', cursor: 'pointer',
+                  fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 700,
+                }}
+              >
+                ×
+              </button>
             </div>
-          </section>
+          </div>
 
-          {/* ── Observações ── */}
-          {pedido.observacoes && (
+          <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+            {/* ── Dados do cliente ── */}
             <section>
-              <h3 style={{ fontSize: 12, fontWeight: 700, color: '#1B6E3C', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8 }}>
-                📝 Observações
+              <h3 style={{ fontSize: 12, fontWeight: 700, color: '#1B6E3C', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                👥 Dados do Cliente
               </h3>
               <div style={{
                 background: '#F8FAFC', border: '1px solid #E5E7EB', borderRadius: 12,
-                padding: '14px 18px', fontSize: 13, color: '#374151', lineHeight: 1.6,
+                padding: '16px 20px',
+                display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+                gap: '12px 24px', fontSize: 13,
               }}>
-                {pedido.observacoes}
+                {[
+                  ['Nome',        cliente.nome      || '—'],
+                  ['CNPJ/CPF',    cliente.cnpjCpf   || '—'],
+                  ['Endereço',    cliente.endereco  || '—'],
+                  ['Bairro',      cliente.bairro    || '—'],
+                  ['Cidade / UF', `${cliente.cidade || '—'} / ${cliente.estado || '—'}`],
+                  ['Telefone',    cliente.telefone  || '—'],
+                  ['WhatsApp',    cliente.whatsapp  || '—'],
+                  ['Contato',     cliente.contato   || '—'],
+                  ['Email',       cliente.email     || '—'],
+                  ['Pagamento',   cliente.pgt       || '—'],
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <div style={{ color: '#9CA3AF', fontWeight: 600, fontSize: 11, marginBottom: 3 }}>{label}</div>
+                    <div style={{ color: '#1F2937', fontWeight: 500 }}>{value}</div>
+                  </div>
+                ))}
               </div>
             </section>
-          )}
 
-          {/* ── Meta ── */}
-          <section style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            fontSize: 12, color: '#9CA3AF', paddingTop: 4, borderTop: '1px solid #F3F4F6',
-            flexWrap: 'wrap', gap: 10,
-          }}>
-            <span>
-              Emitido por: <strong style={{ color: '#6B7280' }}>{pedido.emitidoPor || '— a configurar'}</strong>
-            </span>
-            <span>
-              Data: <strong style={{ color: '#6B7280' }}>
-                {pedido.dataCriacao ? new Date(pedido.dataCriacao).toLocaleDateString('pt-BR') : '—'}
-              </strong>
-            </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span>Alterar status:</span>
-              <StatusSelect
-                pedidoId={pedido.id}
-                current={pedido.status || 'PENDENTE'}
-                onChange={onStatusChange}
-              />
-            </div>
-          </section>
+            {/* ── Itens do pedido ── */}
+            <section>
+              <h3 style={{ fontSize: 12, fontWeight: 700, color: '#1B6E3C', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                📦 Itens do Pedido
+              </h3>
+              <div style={{ border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: '#F8FAFC' }}>
+                      {['Cód.', 'Produto', 'Qtd.', 'Vr. Unitário', 'Vr. Total'].map((h, i) => (
+                        <th key={h} style={{
+                          padding: '10px 14px', fontWeight: 700, fontSize: 11,
+                          color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.5,
+                          textAlign: i >= 2 ? 'right' : 'left',
+                          borderBottom: '1px solid #E5E7EB',
+                        }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(pedido.itens || []).map((item, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                        <td style={{ padding: '10px 14px', color: '#6B7280', fontWeight: 600 }}>{item.codigo || '—'}</td>
+                        <td style={{ padding: '10px 14px', color: '#1F2937' }}>
+                          {item.nome || '—'}
+                          {item.observacoes && (
+                            <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2, fontStyle: 'italic' }}>{item.observacoes}</div>
+                          )}
+                        </td>
+                        <td style={{ padding: '10px 14px', color: '#1F2937', fontWeight: 600, textAlign: 'right' }}>{item.quantidade || 0}</td>
+                        <td style={{ padding: '10px 14px', color: '#1F2937', textAlign: 'right' }}>R$ {fmtBRL(item.vrUnitario)}</td>
+                        <td style={{ padding: '10px 14px', color: '#1F2937', fontWeight: 700, textAlign: 'right' }}>R$ {fmtBRL(item.vrTotal)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
 
+            {/* ── Totais ── */}
+            <section>
+              <div style={{
+                background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 12,
+                padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 8,
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151' }}>
+                  <span>Total de itens</span>
+                  <strong>{totalQtd} unid.</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151' }}>
+                  <span>Subtotal</span>
+                  <strong>R$ {fmtBRL(totalValor)}</strong>
+                </div>
+                {Number(pedido.desconto) > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#DC2626' }}>
+                    <span>Desconto</span>
+                    <strong>− R$ {fmtBRL(pedido.desconto)}</strong>
+                  </div>
+                )}
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between',
+                  paddingTop: 10, borderTop: '1px solid #86EFAC',
+                  fontSize: 17, fontWeight: 900, color: '#1B6E3C',
+                }}>
+                  <span>Valor Final</span>
+                  <span>R$ {fmtBRL(pedido.valorFinal)}</span>
+                </div>
+              </div>
+            </section>
+
+            {/* ── Observações ── */}
+            {pedido.observacoes && (
+              <section>
+                <h3 style={{ fontSize: 12, fontWeight: 700, color: '#1B6E3C', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                  📝 Observações
+                </h3>
+                <div style={{
+                  background: '#F8FAFC', border: '1px solid #E5E7EB', borderRadius: 12,
+                  padding: '14px 18px', fontSize: 13, color: '#374151', lineHeight: 1.6,
+                }}>
+                  {pedido.observacoes}
+                </div>
+              </section>
+            )}
+
+            {/* ── Meta ── */}
+            <section style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              fontSize: 12, color: '#9CA3AF', paddingTop: 4, borderTop: '1px solid #F3F4F6',
+              flexWrap: 'wrap', gap: 10,
+            }}>
+              <span>
+                Emitido por: <strong style={{ color: '#6B7280' }}>{pedido.emitidoPor || '—'}</strong>
+              </span>
+              <span>
+                Data: <strong style={{ color: '#6B7280' }}>
+                  {pedido.dataCriacao ? new Date(pedido.dataCriacao).toLocaleDateString('pt-BR') : '—'}
+                </strong>
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>Alterar status:</span>
+                <StatusSelect
+                  pedidoId={pedido.id}
+                  current={pedido.status || 'PENDENTE'}
+                  onChange={onStatusChange}
+                />
+              </div>
+            </section>
+
+          </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }
 
@@ -226,6 +410,8 @@ export default function PedidosEmitidos() {
   const [filtroStatus, setFiltroStatus] = useState('TODOS')
   const [busca, setBusca]               = useState('')
   const [pedidoModal, setPedidoModal]   = useState(null)
+
+  const { isAdmin } = useAuth()
 
   useEffect(() => {
     getPedidos().then(data => { setPedidos(data); setLoading(false) })
@@ -240,9 +426,13 @@ export default function PedidosEmitidos() {
 
   const handleStatusChange = useCallback((id, novoStatus) => {
     setPedidos(prev => prev.map(p => p.id === id ? { ...p, status: novoStatus } : p))
-    // Atualiza também o modal caso esteja aberto nesse pedido
     setPedidoModal(prev => prev?.id === id ? { ...prev, status: novoStatus } : prev)
   }, [])
+
+  async function handleDelete(id) {
+    await deletePedido(id)
+    setPedidos(prev => prev.filter(p => p.id !== id))
+  }
 
   // Contagens para os botões de filtro
   const contagem = STATUS_LIST.reduce((acc, s) => {
@@ -264,12 +454,14 @@ export default function PedidosEmitidos() {
 
   return (
     <div>
-      {/* Modal */}
+      {/* Modal de detalhes */}
       {pedidoModal && (
         <PedidoModal
           pedido={pedidoModal}
+          isAdmin={isAdmin}
           onClose={() => setPedidoModal(null)}
           onStatusChange={handleStatusChange}
+          onDelete={handleDelete}
         />
       )}
 
@@ -290,7 +482,7 @@ export default function PedidosEmitidos() {
             borderColor: filtroStatus === 'TODOS' ? '#1B6E3C' : '#E5E7EB',
             background: filtroStatus === 'TODOS' ? '#1B6E3C' : 'white',
             color: filtroStatus === 'TODOS' ? 'white' : '#6B7280',
-            fontWeight: 600, fontSize: 13, cursor: 'pointer', transition: 'all 0.15s',
+            fontWeight: 600, fontSize: 13, cursor: 'pointer',
           }}
         >
           Todos ({pedidos.length})
@@ -300,17 +492,13 @@ export default function PedidosEmitidos() {
           const cfg   = STATUS_CONFIG[s]
           const ativo = filtroStatus === s
           return (
-            <button
-              key={s}
-              onClick={() => setFiltroStatus(s)}
-              style={{
-                padding: '7px 16px', borderRadius: 100, fontSize: 13, fontWeight: 700,
-                cursor: 'pointer', transition: 'all 0.15s', border: '1.5px solid',
-                borderColor: ativo ? cfg.dot : cfg.border,
-                background: ativo ? cfg.dot : cfg.bg,
-                color: ativo ? 'white' : cfg.color,
-              }}
-            >
+            <button key={s} onClick={() => setFiltroStatus(s)} style={{
+              padding: '7px 16px', borderRadius: 100, fontSize: 13, fontWeight: 700,
+              cursor: 'pointer', border: '1.5px solid',
+              borderColor: ativo ? cfg.dot : cfg.border,
+              background:  ativo ? cfg.dot : cfg.bg,
+              color:       ativo ? 'white' : cfg.color,
+            }}>
               {cfg.label} ({contagem[s]})
             </button>
           )
@@ -386,7 +574,6 @@ export default function PedidosEmitidos() {
                   <td style={{ textAlign: 'right', fontWeight: 700, color: '#1F2937', fontSize: 14 }}>
                     R$ {fmtBRL(p.valorFinal)}
                   </td>
-                  {/* stopPropagation no status para não abrir o modal ao trocar */}
                   <td onClick={e => e.stopPropagation()}>
                     <StatusSelect
                       pedidoId={p.id}
@@ -395,9 +582,7 @@ export default function PedidosEmitidos() {
                     />
                   </td>
                   <td style={{ fontSize: 13, color: '#6B7280' }}>
-                    {p.emitidoPor || (
-                      <span style={{ color: '#D1D5DB', fontStyle: 'italic' }}>— a configurar</span>
-                    )}
+                    {p.emitidoPor || <span style={{ color: '#D1D5DB', fontStyle: 'italic' }}>—</span>}
                   </td>
                   <td style={{ fontSize: 12, color: '#9CA3AF', whiteSpace: 'nowrap' }}>
                     {p.dataCriacao ? new Date(p.dataCriacao).toLocaleDateString('pt-BR') : '-'}
