@@ -1,11 +1,10 @@
 import { Outlet, NavLink, Link, useLocation, useNavigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { seedDadosIniciais } from '../../utils/storage'
 
 export default function PedidoLayout() {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [mobileOpen, setMobileOpen]   = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const location   = useLocation()
   const navigate   = useNavigate()
   const { profile, isAdmin, signOut } = useAuth()
@@ -35,11 +34,9 @@ export default function PedidoLayout() {
       <style>{`
         .ped-aside {
           width: 240px; background: #1B6E3C;
-          display: flex; flex-direction: column;
-          transition: width 0.25s; flex-shrink: 0;
+          display: flex; flex-direction: column; flex-shrink: 0;
           position: sticky; top: 0; height: 100vh; overflow-x: hidden; z-index: 200;
         }
-        .ped-aside.collapsed { width: 64px; }
         .ped-mobile-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 300; }
         .ped-mobile-drawer  { display: none; position: fixed; top: 0; left: 0; bottom: 0; width: 260px; background: #1B6E3C; flex-direction: column; z-index: 400; box-shadow: 4px 0 24px rgba(0,0,0,0.2); transform: translateX(-100%); transition: transform 0.25s ease; }
         .ped-mobile-drawer.open { transform: translateX(0); }
@@ -100,55 +97,44 @@ export default function PedidoLayout() {
       </div>
 
       {/* Sidebar Desktop */}
-      <aside className={`ped-aside${sidebarOpen ? '' : ' collapsed'}`}>
-        <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: 10, justifyContent: sidebarOpen ? 'flex-start' : 'center' }}>
-          {sidebarOpen ? (
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-              <span style={{ fontFamily: '"Playfair Display", serif', fontStyle: 'italic', fontWeight: 700, fontSize: 22, color: 'white' }}>Dita</span>
-              <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.6)', letterSpacing: 2, textTransform: 'uppercase' }}>Bolsas</span>
-            </div>
-          ) : (
-            <span style={{ fontFamily: '"Playfair Display", serif', fontStyle: 'italic', fontWeight: 700, fontSize: 20, color: 'white' }}>D</span>
-          )}
+      <aside className="ped-aside">
+        {/* Logo */}
+        <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontFamily: '"Playfair Display", serif', fontStyle: 'italic', fontWeight: 700, fontSize: 22, color: 'white' }}>Dita</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.6)', letterSpacing: 2, textTransform: 'uppercase' }}>Bolsas</span>
         </div>
 
-        <button onClick={() => setSidebarOpen(o => !o)} style={{ margin: '12px auto', width: 32, height: 32, borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          title={sidebarOpen ? 'Recolher' : 'Expandir'}>
-          {sidebarOpen ? '◀' : '▶'}
-        </button>
-
-        {sidebarOpen && <div style={{ padding: '4px 16px 8px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5, color: 'rgba(255,255,255,0.4)' }}>Menu</div>}
+        {/* Label Menu */}
+        <div style={{ padding: '12px 16px 6px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5, color: 'rgba(255,255,255,0.4)' }}>Menu</div>
 
         <nav style={{ flex: 1, padding: '4px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
           {NAV.map(item => {
             const isActive = item.exact ? location.pathname === item.to : location.pathname.startsWith(item.to)
             return (
-              <NavLink key={item.to} to={item.to} title={!sidebarOpen ? item.label : undefined} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: sidebarOpen ? '11px 16px' : '11px', borderRadius: 10, color: isActive ? '#1B6E3C' : 'rgba(255,255,255,0.8)', background: isActive ? 'white' : 'transparent', fontWeight: isActive ? 700 : 500, fontSize: 14, justifyContent: sidebarOpen ? 'flex-start' : 'center', transition: 'all 0.2s', textDecoration: 'none' }}>
+              <NavLink key={item.to} to={item.to} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', borderRadius: 10, color: isActive ? '#1B6E3C' : 'rgba(255,255,255,0.8)', background: isActive ? 'white' : 'transparent', fontWeight: isActive ? 700 : 500, fontSize: 14, transition: 'all 0.2s', textDecoration: 'none' }}>
                 <span style={{ fontSize: 18 }}>{item.icon}</span>
-                {sidebarOpen && item.label}
+                {item.label}
               </NavLink>
             )
           })}
         </nav>
 
-        {/* Rodapé desktop — usuário + logout */}
+        {/* Rodapé desktop — usuário + links */}
         <div style={{ padding: '12px 8px', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {sidebarOpen && (
-            <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-              <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: 'white', fontWeight: 700, flexShrink: 0 }}>
-                {(profile?.nome || '?')[0].toUpperCase()}
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile?.nome || 'Usuário'}</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{profile?.tipo}</div>
-              </div>
+          <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: 'white', fontWeight: 700, flexShrink: 0 }}>
+              {(profile?.nome || '?')[0].toUpperCase()}
             </div>
-          )}
-          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, color: 'rgba(255,255,255,0.7)', fontSize: 13, textDecoration: 'none', justifyContent: sidebarOpen ? 'flex-start' : 'center' }}>
-            <span>🌐</span>{sidebarOpen && 'Ver Site'}
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile?.nome || 'Usuário'}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{profile?.tipo}</div>
+            </div>
+          </div>
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, color: 'rgba(255,255,255,0.7)', fontSize: 13, textDecoration: 'none' }}>
+            <span>🌐</span> Ver Site
           </Link>
-          <button onClick={handleLogout} title={!sidebarOpen ? 'Sair' : undefined} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, color: '#FCA5A5', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', width: '100%', justifyContent: sidebarOpen ? 'flex-start' : 'center' }}>
-            <span>🚪</span>{sidebarOpen && 'Sair'}
+          <button onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, color: '#FCA5A5', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+            <span>🚪</span> Sair
           </button>
         </div>
       </aside>
