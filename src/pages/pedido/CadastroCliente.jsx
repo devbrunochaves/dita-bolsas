@@ -6,6 +6,24 @@ const ESTADOS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG
 const PGTS    = ['BOLETO', 'PIX', 'CARTÃO CRÉDITO', 'CARTÃO DÉBITO', 'DINHEIRO', 'CHEQUE', 'TRANSFERÊNCIA', 'A PRAZO']
 const INITIAL = { nome: '', cnpjCpf: '', endereco: '', telefone: '', bairro: '', cidade: '', estado: 'ES', whatsapp: '', contato: '', email: '', pgt: 'BOLETO' }
 
+// Formata automaticamente CPF (11 dígitos) ou CNPJ (14 dígitos)
+function formatCnpjCpf(value) {
+  const d = value.replace(/\D/g, '').slice(0, 14)
+  if (d.length <= 11) {
+    // CPF: XXX.XXX.XXX-XX
+    return d
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
+  }
+  // CNPJ: XX.XXX.XXX/XXXX-XX
+  return d
+    .replace(/(\d{2})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1/$2')
+    .replace(/(\d{4})(\d{1,2})$/, '$1-$2')
+}
+
 // ── Definido FORA do componente para evitar remontagem a cada keystroke ──
 function Field({ label, name, type = 'text', placeholder, options, value, onChange }) {
   return (
@@ -48,7 +66,13 @@ export default function CadastroCliente() {
     }
   }, [id])
 
-  const handleChange = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }))
+  const handleChange = e => {
+    const { name, value } = e.target
+    setForm(f => ({
+      ...f,
+      [name]: name === 'cnpjCpf' ? formatCnpjCpf(value) : value,
+    }))
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()

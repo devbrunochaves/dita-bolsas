@@ -233,7 +233,6 @@ export default function ListaClientes() {
                 <th>Cidade / UF</th>
                 <th>Contato</th>
                 <th>WhatsApp</th>
-                <th>PGT</th>
                 <th style={{ textAlign: 'right' }}>Ações</th>
               </tr>
             </thead>
@@ -265,7 +264,6 @@ export default function ListaClientes() {
                           style={{ color: '#1B6E3C', fontWeight: 600 }}>{c.whatsapp}</a>
                       : <span style={{ color: '#D1D5DB' }}>—</span>}
                   </td>
-                  <td>{c.pgt && <span className="ped-badge ped-badge-green">{c.pgt}</span>}</td>
                   <td>
                     <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
                       <button onClick={() => navigate(`/pedido/clientes/editar/${c.id}`)}

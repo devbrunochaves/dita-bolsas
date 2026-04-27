@@ -38,7 +38,7 @@ export async function getClientes() {
     .select('*')
     .order('nome')
   check(error, 'getClientes')
-  return data || []
+  return (data || []).map(mapCliente)
 }
 
 export async function getClienteById(id) {
@@ -48,7 +48,7 @@ export async function getClienteById(id) {
     .eq('id', id)
     .single()
   check(error, 'getClienteById')
-  return data
+  return mapCliente(data)
 }
 
 export async function saveCliente(cliente) {
