@@ -92,13 +92,30 @@ export async function deleteCliente(id) {
   check(error, 'deleteCliente')
 }
 
+// Formata CPF (11 dígitos) ou CNPJ (14 dígitos)
+function formatCnpjCpf(value) {
+  if (!value) return ''
+  const d = String(value).replace(/\D/g, '').slice(0, 14)
+  if (d.length <= 11) {
+    return d
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
+  }
+  return d
+    .replace(/(\d{2})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1/$2')
+    .replace(/(\d{4})(\d{1,2})$/, '$1-$2')
+}
+
 // snake_case → camelCase
 function mapCliente(r) {
   if (!r) return null
   return {
     id:       r.id,
     nome:     r.nome,
-    cnpjCpf:  r.cnpj_cpf  || '',
+    cnpjCpf:  formatCnpjCpf(r.cnpj_cpf),
     endereco: r.endereco   || '',
     telefone: r.telefone   || '',
     bairro:   r.bairro     || '',
