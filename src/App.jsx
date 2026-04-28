@@ -17,6 +17,7 @@ import ListaClientes from './pages/pedido/ListaClientes'
 import ListaProdutos from './pages/pedido/ListaProdutos'
 import PedidosEmitidos from './pages/pedido/PedidosEmitidos'
 import Colaboradores from './pages/pedido/Colaboradores'
+import Financeiro from './pages/pedido/Financeiro'
 
 export default function App() {
   return (
@@ -49,6 +50,11 @@ export default function App() {
           <Route path="colaboradores" element={
             <ProtectedRoute adminOnly>
               <Colaboradores />
+            </ProtectedRoute>
+          } />
+          <Route path="financeiro" element={
+            <ProtectedRoute adminOnly>
+              <Financeiro />
             </ProtectedRoute>
           } />
         </Route>

@@ -14,7 +14,7 @@ function check(error, context) {
   }
 }
 
-// helper interno: registra uma ação no histórico do pedido (fire-and-forget)
+// helper: registra no histórico do pedido (fire-and-forget)
 async function logHistorico(pedidoId, acao, userId, userName) {
   try {
     await supabase.from('pedido_historico').insert({
@@ -23,8 +23,34 @@ async function logHistorico(pedidoId, acao, userId, userName) {
       user_nome: userName || 'Sistema',
       acao,
     })
+  } catch { /* histórico não é crítico */ }
+}
+
+// helper: registra no histórico financeiro (fire-and-forget)
+async function logHistoricoFin(pedidoId, acao, userId, userName) {
+  try {
+    await supabase.from('historico_financeiro').insert({
+      pedido_id: pedidoId,
+      user_id:   userId   || null,
+      user_nome: userName || 'Sistema',
+      acao,
+    })
+  } catch { /* silencia */ }
+}
+
+// helper: pega usuário logado + profile
+async function getUserAndProfile() {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { user: null, profile: null }
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('nome, comissao_percentual')
+      .eq('id', user.id)
+      .single()
+    return { user, profile }
   } catch {
-    // histórico não é crítico — silencia erros
+    return { user: null, profile: null }
   }
 }
 
@@ -52,7 +78,6 @@ export async function getClienteById(id) {
 }
 
 export async function saveCliente(cliente) {
-  // mapeia camelCase → snake_case do banco
   const row = {
     nome:      cliente.nome,
     cnpj_cpf:  cliente.cnpjCpf  || null,
@@ -69,19 +94,12 @@ export async function saveCliente(cliente) {
 
   if (cliente.id) {
     const { data, error } = await supabase
-      .from('clientes')
-      .update(row)
-      .eq('id', cliente.id)
-      .select()
-      .single()
+      .from('clientes').update(row).eq('id', cliente.id).select().single()
     check(error, 'saveCliente/update')
     return mapCliente(data)
   } else {
     const { data, error } = await supabase
-      .from('clientes')
-      .insert(row)
-      .select()
-      .single()
+      .from('clientes').insert(row).select().single()
     check(error, 'saveCliente/insert')
     return mapCliente(data)
   }
@@ -92,7 +110,6 @@ export async function deleteCliente(id) {
   check(error, 'deleteCliente')
 }
 
-// Formata CPF (11 dígitos) ou CNPJ (14 dígitos)
 function formatCnpjCpf(value) {
   if (!value) return ''
   const d = String(value).replace(/\D/g, '').slice(0, 14)
@@ -109,7 +126,6 @@ function formatCnpjCpf(value) {
     .replace(/(\d{4})(\d{1,2})$/, '$1-$2')
 }
 
-// snake_case → camelCase
 function mapCliente(r) {
   if (!r) return null
   return {
@@ -134,29 +150,21 @@ function mapCliente(r) {
 
 export async function getProdutos() {
   const { data, error } = await supabase
-    .from('produtos')
-    .select('*')
-    .order('codigo')
+    .from('produtos').select('*').order('codigo')
   check(error, 'getProdutos')
   return (data || []).map(mapProduto)
 }
 
 export async function getProdutoById(id) {
   const { data, error } = await supabase
-    .from('produtos')
-    .select('*')
-    .eq('id', id)
-    .single()
+    .from('produtos').select('*').eq('id', id).single()
   check(error, 'getProdutoById')
   return mapProduto(data)
 }
 
 export async function getProdutoByCodigo(codigo) {
   const { data, error } = await supabase
-    .from('produtos')
-    .select('*')
-    .eq('codigo', codigo)
-    .maybeSingle()
+    .from('produtos').select('*').eq('codigo', codigo).maybeSingle()
   check(error, 'getProdutoByCodigo')
   return data ? mapProduto(data) : null
 }
@@ -170,19 +178,12 @@ export async function saveProduto(produto) {
 
   if (produto.id) {
     const { data, error } = await supabase
-      .from('produtos')
-      .update(row)
-      .eq('id', produto.id)
-      .select()
-      .single()
+      .from('produtos').update(row).eq('id', produto.id).select().single()
     check(error, 'saveProduto/update')
     return mapProduto(data)
   } else {
     const { data, error } = await supabase
-      .from('produtos')
-      .insert(row)
-      .select()
-      .single()
+      .from('produtos').insert(row).select().single()
     check(error, 'saveProduto/insert')
     return mapProduto(data)
   }
@@ -212,44 +213,53 @@ export async function getPedidos() {
 }
 
 export async function savePedido(pedido) {
-  // Usuário logado
-  const { data: { user } } = await supabase.auth.getUser()
+  const { user, profile } = await getUserAndProfile()
 
-  // Nome do emitente via profile
-  let nomeEmitente = pedido.emitidoPor || null
-  if (user && !nomeEmitente) {
-    const { data: prof } = await supabase
-      .from('profiles').select('nome').eq('id', user.id).single()
-    nomeEmitente = prof?.nome || user.email || null
-  }
+  const nomeEmitente      = profile?.nome || user?.email || pedido.emitidoPor || null
+  const comissaoPercent   = Number(profile?.comissao_percentual || 0)
+  const valorFinal        = Number(pedido.valorFinal || 0)
+  const valorComissao     = parseFloat(((valorFinal * comissaoPercent) / 100).toFixed(2))
 
-  // Busca o próximo número
+  // Busca próximo número
   const { count } = await supabase
     .from('pedidos')
     .select('*', { count: 'exact', head: true })
 
   const row = {
-    numero:           (count || 0) + 1,
-    cliente_id:       pedido.cliente?.id || null,
-    cliente_snapshot: pedido.cliente || null,
-    itens:            pedido.itens || [],
-    desconto:         Number(pedido.desconto || 0),
-    valor_final:      Number(pedido.valorFinal || 0),
-    observacoes:      pedido.observacoes || '',
-    status:           'PENDENTE',
-    emitido_por:      nomeEmitente,
-    user_id:          user?.id || null,
+    numero:              (count || 0) + 1,
+    cliente_id:          pedido.cliente?.id || null,
+    cliente_snapshot:    pedido.cliente || null,
+    itens:               pedido.itens || [],
+    desconto:            Number(pedido.desconto || 0),
+    valor_final:         valorFinal,
+    observacoes:         pedido.observacoes || '',
+    status:              'PENDENTE',
+    emitido_por:         nomeEmitente,
+    user_id:             user?.id || null,
+    // Financeiro
+    status_financeiro:   'pendente',
+    comissao_percentual: comissaoPercent,
+    valor_comissao:      valorComissao,
+    comissao_paga:       false,
   }
 
   const { data, error } = await supabase
-    .from('pedidos')
-    .insert(row)
-    .select()
-    .single()
+    .from('pedidos').insert(row).select().single()
   check(error, 'savePedido')
 
-  // Registra criação no histórico
+  // Histórico operacional
   logHistorico(data.id, 'Pedido criado', user?.id, nomeEmitente)
+
+  // Histórico financeiro
+  logHistoricoFin(data.id, 'Pedido criado — aguardando vencimento', user?.id, nomeEmitente)
+  if (comissaoPercent > 0) {
+    logHistoricoFin(
+      data.id,
+      `Comissão gerada: ${comissaoPercent}% = R$ ${valorComissao.toFixed(2).replace('.', ',')}`,
+      user?.id,
+      nomeEmitente
+    )
+  }
 
   return mapPedido(data)
 }
@@ -261,23 +271,17 @@ export async function deletePedido(id) {
 
 export async function updatePedidoStatus(id, status) {
   const { error } = await supabase
-    .from('pedidos')
-    .update({ status })
-    .eq('id', id)
+    .from('pedidos').update({ status }).eq('id', id)
   check(error, 'updatePedidoStatus')
 
-  // Registra mudança de status no histórico
   const STATUS_LABEL = { PENDENTE: 'Pendente', ENTREGUE: 'Entregue', CANCELADO: 'Cancelado' }
   try {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: prof }     = await supabase.from('profiles').select('nome').eq('id', user?.id).single()
-    logHistorico(id, `Status alterado para ${STATUS_LABEL[status] || status}`, user?.id, prof?.nome || user?.email)
+    const { user, profile } = await getUserAndProfile()
+    logHistorico(id, `Status alterado para ${STATUS_LABEL[status] || status}`, user?.id, profile?.nome)
   } catch {
     logHistorico(id, `Status alterado para ${STATUS_LABEL[status] || status}`)
   }
 }
-
-// ── Histórico ──────────────────────────────────────────────
 
 export async function getPedidoHistorico(pedidoId) {
   const { data, error } = await supabase
@@ -292,62 +296,175 @@ export async function getPedidoHistorico(pedidoId) {
 function mapPedido(r) {
   if (!r) return null
   return {
-    id:          r.id,
-    numero:      r.numero,
-    cliente:     r.cliente_snapshot,
-    itens:       r.itens || [],
-    desconto:    Number(r.desconto || 0),
-    valorFinal:  Number(r.valor_final || 0),
-    observacoes: r.observacoes || '',
-    dataCriacao: r.created_at,
-    status:      r.status || 'PENDENTE',
-    emitidoPor:  r.emitido_por || null,
+    id:                  r.id,
+    numero:              r.numero,
+    cliente:             r.cliente_snapshot,
+    itens:               r.itens || [],
+    desconto:            Number(r.desconto || 0),
+    valorFinal:          Number(r.valor_final || 0),
+    observacoes:         r.observacoes || '',
+    dataCriacao:         r.created_at,
+    status:              r.status || 'PENDENTE',
+    emitidoPor:          r.emitido_por || null,
+    userId:              r.user_id || null,
+    // Financeiro
+    statusFinanceiro:    r.status_financeiro  || 'pendente',
+    dataVencimento:      r.data_vencimento    || null,
+    dataPagamento:       r.data_pagamento     || null,
+    comissaoPercentual:  Number(r.comissao_percentual || 0),
+    valorComissao:       Number(r.valor_comissao || 0),
+    comissaoPaga:        r.comissao_paga      || false,
   }
 }
 
 // ============================================================
-//  PROFILES
+//  FINANCEIRO
+// ============================================================
+
+/**
+ * Busca pedidos com filtros financeiros.
+ * inicio/fim são strings 'YYYY-MM-DD' aplicadas em created_at.
+ */
+export async function getFinanceiro({ inicio, fim, vendedor, clienteNome, statusFinanceiro } = {}) {
+  let query = supabase
+    .from('pedidos')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (inicio) query = query.gte('created_at', inicio + 'T00:00:00.000Z')
+  if (fim)    query = query.lte('created_at', fim    + 'T23:59:59.999Z')
+  if (vendedor && vendedor !== 'todos')
+    query = query.ilike('emitido_por', `%${vendedor}%`)
+  if (statusFinanceiro && statusFinanceiro !== 'todos')
+    query = query.eq('status_financeiro', statusFinanceiro)
+
+  const { data, error } = await query
+  check(error, 'getFinanceiro')
+
+  let pedidos = (data || []).map(mapPedido)
+
+  // Filtro de cliente por nome (em cliente_snapshot)
+  if (clienteNome && clienteNome.trim()) {
+    const lower = clienteNome.toLowerCase()
+    pedidos = pedidos.filter(p =>
+      p.cliente?.nome?.toLowerCase().includes(lower)
+    )
+  }
+
+  return pedidos
+}
+
+/**
+ * Atualiza status financeiro de um pedido.
+ * Se status = 'pago' e não informou dataPagamento, usa hoje.
+ */
+export async function updateStatusFinanceiro(id, statusFinanceiro, dataPagamento = null) {
+  const hoje = new Date().toISOString().split('T')[0]
+  const updates = { status_financeiro: statusFinanceiro }
+
+  if (statusFinanceiro === 'pago') {
+    updates.data_pagamento = dataPagamento || hoje
+  } else if (statusFinanceiro === 'pendente' || statusFinanceiro === 'cancelado') {
+    updates.data_pagamento = null
+  }
+
+  const { error } = await supabase.from('pedidos').update(updates).eq('id', id)
+  check(error, 'updateStatusFinanceiro')
+
+  const { user, profile } = await getUserAndProfile()
+  const label = { pendente: 'Pendente', pago: 'Pago', atrasado: 'Atrasado', cancelado: 'Cancelado' }
+  logHistoricoFin(
+    id,
+    `Status financeiro alterado para ${label[statusFinanceiro] || statusFinanceiro}`,
+    user?.id,
+    profile?.nome
+  )
+}
+
+/** Define/atualiza a data de vencimento */
+export async function updateDataVencimento(id, dataVencimento) {
+  const { error } = await supabase
+    .from('pedidos')
+    .update({ data_vencimento: dataVencimento })
+    .eq('id', id)
+  check(error, 'updateDataVencimento')
+
+  const { user, profile } = await getUserAndProfile()
+  const fmt = dataVencimento
+    ? new Date(dataVencimento + 'T12:00:00').toLocaleDateString('pt-BR')
+    : 'removido'
+  logHistoricoFin(id, `Vencimento definido: ${fmt}`, user?.id, profile?.nome)
+}
+
+/** Marca comissão de um pedido específico como paga */
+export async function marcarComissaoPaga(pedidoId) {
+  const { error } = await supabase
+    .from('pedidos')
+    .update({ comissao_paga: true })
+    .eq('id', pedidoId)
+  check(error, 'marcarComissaoPaga')
+
+  const { user, profile } = await getUserAndProfile()
+  logHistoricoFin(pedidoId, 'Comissão marcada como paga', user?.id, profile?.nome)
+}
+
+/** Marca comissão de TODOS os pedidos pendentes de um vendedor como pagas */
+export async function marcarTodasComissoesPagas(nomeVendedor) {
+  const { error } = await supabase
+    .from('pedidos')
+    .update({ comissao_paga: true })
+    .eq('emitido_por', nomeVendedor)
+    .eq('comissao_paga', false)
+    .neq('status_financeiro', 'cancelado')
+  check(error, 'marcarTodasComissoesPagas')
+
+  const { user, profile } = await getUserAndProfile()
+  // Log em cada pedido afetado seria custoso; registra no pedido 0 como ação geral
+  // (silencia — não temos um pedido único aqui)
+  console.log(`[storage] Comissões de ${nomeVendedor} marcadas como pagas por ${profile?.nome}`)
+}
+
+/** Histórico financeiro de um pedido */
+export async function getHistoricoFinanceiro(pedidoId) {
+  const { data, error } = await supabase
+    .from('historico_financeiro')
+    .select('*')
+    .eq('pedido_id', pedidoId)
+    .order('created_at', { ascending: true })
+  check(error, 'getHistoricoFinanceiro')
+  return data || []
+}
+
+// ============================================================
+//  PROFILES / COLABORADORES
 // ============================================================
 
 export async function getProfiles() {
   const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .order('nome')
+    .from('profiles').select('*').order('nome')
   check(error, 'getProfiles')
   return data || []
 }
 
 export async function updateProfile(id, updates) {
   const { error } = await supabase
-    .from('profiles')
-    .update(updates)
-    .eq('id', id)
+    .from('profiles').update(updates).eq('id', id)
   check(error, 'updateProfile')
 }
 
-export async function criarColaborador({ email, password, nome, tipo }) {
-  // 1. Verifica se já existe um profile com esse email (ativo ou desativado)
-  //    Isso evita tentar criar um usuário que já existe no auth.users
+export async function criarColaborador({ email, password, nome, tipo, comissaoPercentual = 0 }) {
   const { data: existing } = await supabase
-    .from('profiles')
-    .select('id, ativo')
-    .eq('email', email)
-    .maybeSingle()
+    .from('profiles').select('id, ativo').eq('email', email).maybeSingle()
 
   if (existing) {
-    // Usuário já existe: apenas reativa e atualiza dados (sem novo signUp)
     const { error } = await supabase
       .from('profiles')
-      .update({ nome, tipo, ativo: true })
+      .update({ nome, tipo, ativo: true, comissao_percentual: Number(comissaoPercentual) })
       .eq('id', existing.id)
     if (error) throw new Error(error.message)
     return { reativado: true, user: { id: existing.id } }
   }
 
-  // 2. Usuário novo: usa cliente temporário para NÃO deslogar o admin atual.
-  //    persistSession: false → sessão fica só em memória, não toca o localStorage
-  //    do cliente principal, portanto o onAuthStateChange do admin não dispara.
   const tempClient = createClient(
     import.meta.env.VITE_SUPABASE_URL,
     import.meta.env.VITE_SUPABASE_ANON_KEY,
@@ -361,14 +478,20 @@ export async function criarColaborador({ email, password, nome, tipo }) {
   })
   if (error) throw new Error(error.message)
 
-  // O trigger handle_new_user cria o profile automaticamente com nome e tipo
-  // vindos de raw_user_meta_data. Nenhuma ação adicional necessária aqui.
+  // Atualiza comissão após criar (trigger cria o profile automaticamente)
+  if (data?.user?.id) {
+    setTimeout(async () => {
+      await supabase
+        .from('profiles')
+        .update({ comissao_percentual: Number(comissaoPercentual) })
+        .eq('id', data.user.id)
+    }, 2000)
+  }
+
   return data
 }
 
 export async function deleteColaborador(id) {
-  // Soft delete via função SQL com SECURITY DEFINER (apenas admin pode chamar)
-  // Define ativo = false em vez de excluir — evita problemas de "already registered"
   const { error } = await supabase.rpc('excluir_colaborador', { profile_id: id })
   check(error, 'deleteColaborador')
 }
