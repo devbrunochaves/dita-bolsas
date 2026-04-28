@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 
 // ---- Contador animado ----
 function Counter({ target, suffix = '', prefix = '' }) {
@@ -30,7 +30,7 @@ function Counter({ target, suffix = '', prefix = '' }) {
 }
 
 // ---- Card de produto ----
-function ProductCard({ emoji, title, desc, image }) {
+function ProductCard({ emoji, title, desc }) {
   return (
     <div style={{
       background: 'white',
@@ -51,6 +51,180 @@ function ProductCard({ emoji, title, desc, image }) {
         <Link to="/produtos" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 14, color: '#D41B2C', fontWeight: 600, fontSize: 14 }}>
           Ver mais →
         </Link>
+      </div>
+    </div>
+  )
+}
+
+// ---- Carrossel de galeria ----
+const SLIDES = [
+  { id: 1, label: 'Bolsas Personalizadas',  bg: 'linear-gradient(135deg,#F5E6E7,#FECDD3)', emoji: '👜' },
+  { id: 2, label: 'Canecas',                bg: 'linear-gradient(135deg,#E0F2FE,#BAE6FD)', emoji: '☕' },
+  { id: 3, label: 'Bonés e Uniformes',      bg: 'linear-gradient(135deg,#F0FDF4,#BBF7D0)', emoji: '🧢' },
+  { id: 4, label: 'Camisas',                bg: 'linear-gradient(135deg,#FFF7ED,#FED7AA)', emoji: '👕' },
+  { id: 5, label: 'Chaveiros',              bg: 'linear-gradient(135deg,#F5F3FF,#DDD6FE)', emoji: '🔑' },
+  { id: 6, label: 'Porta-Retratos',         bg: 'linear-gradient(135deg,#FEF3C7,#FDE68A)', emoji: '🖼️' },
+]
+
+function Carousel() {
+  const total = SLIDES.length
+  const [index, setIndex]   = useState(0)   // logical slide index (can go –1 or total for wraparound)
+  const [animate, setAnimate] = useState(true)
+  const [spv, setSpv]       = useState(3)   // slides per view
+  const [paused, setPaused] = useState(false)
+  const trackRef = useRef(null)
+
+  // ── Responsive slides-per-view ──────────────────────────────
+  useEffect(() => {
+    function upd() {
+      if      (window.innerWidth < 640)  setSpv(1)
+      else if (window.innerWidth < 1024) setSpv(2)
+      else                               setSpv(3)
+    }
+    upd()
+    window.addEventListener('resize', upd)
+    return () => window.removeEventListener('resize', upd)
+  }, [])
+
+  // Reset index when spv changes so we don't land on a clone
+  useEffect(() => { setIndex(0); setAnimate(false) }, [spv])
+
+  // ── Build cloned array: [last spv slides] + real + [first spv slides] ──
+  const cloned = [
+    ...SLIDES.slice(-spv),
+    ...SLIDES,
+    ...SLIDES.slice(0, spv),
+  ]
+
+  const slideW   = 100 / spv
+  const pos      = index + spv                    // position within cloned array
+  const translateX = -(pos * slideW)
+
+  // ── After transition: jump without animation when on a clone ──
+  function handleTransitionEnd() {
+    if (index >= total) {
+      setAnimate(false)
+      setIndex(0)
+    } else if (index < 0) {
+      setAnimate(false)
+      setIndex(total - 1)
+    }
+  }
+
+  // Re-enable animation one frame after non-animated jump
+  useEffect(() => {
+    if (!animate) {
+      const id = requestAnimationFrame(() =>
+        requestAnimationFrame(() => setAnimate(true))
+      )
+      return () => cancelAnimationFrame(id)
+    }
+  }, [animate])
+
+  const next = useCallback(() => {
+    setAnimate(true)
+    setIndex(i => i + 1)
+  }, [])
+
+  const prev = useCallback(() => {
+    setAnimate(true)
+    setIndex(i => i - 1)
+  }, [])
+
+  // ── Autoplay ────────────────────────────────────────────────
+  useEffect(() => {
+    if (paused) return
+    const t = setInterval(next, 3000)
+    return () => clearInterval(t)
+  }, [paused, next])
+
+  // ── Dot active index (always 0-5) ───────────────────────────
+  const dotActive = ((index % total) + total) % total
+
+  // ── Arrow button factory ─────────────────────────────────────
+  function Arrow({ dir, onClick }) {
+    return (
+      <button
+        onClick={onClick}
+        onMouseEnter={e => { e.currentTarget.style.background = '#D41B2C'; e.currentTarget.style.color = 'white' }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'white';   e.currentTarget.style.color = '#374151' }}
+        style={{
+          position: 'absolute', top: '45%',
+          transform: 'translateY(-50%)',
+          [dir === 'left' ? 'left' : 'right']: -18,
+          zIndex: 10,
+          width: 44, height: 44, borderRadius: '50%',
+          background: 'white', border: 'none',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+          cursor: 'pointer', fontSize: 26, fontWeight: 700,
+          color: '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          transition: 'background 0.2s, color 0.2s',
+        }}
+      >
+        {dir === 'left' ? '‹' : '›'}
+      </button>
+    )
+  }
+
+  return (
+    <div style={{ position: 'relative', padding: '0 28px' }}>
+      {/* Viewport */}
+      <div
+        style={{ overflow: 'hidden', borderRadius: 16 }}
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+      >
+        {/* Track */}
+        <div
+          ref={trackRef}
+          onTransitionEnd={handleTransitionEnd}
+          style={{
+            display: 'flex',
+            transform: `translateX(${translateX}%)`,
+            transition: animate ? 'transform 0.55s cubic-bezier(0.25,0.1,0.25,1)' : 'none',
+          }}
+        >
+          {cloned.map((slide, i) => (
+            <div
+              key={i}
+              style={{ minWidth: `${slideW}%`, padding: '0 10px', boxSizing: 'border-box' }}
+            >
+              <div style={{
+                background: slide.bg,
+                borderRadius: 14,
+                height: 280,
+                display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center', gap: 12,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+              }}>
+                <span style={{ fontSize: 72 }}>{slide.emoji}</span>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: '#1F2937' }}>{slide.label}</div>
+                  <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 4 }}>📸 Foto em breve</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <Arrow dir="left"  onClick={prev} />
+      <Arrow dir="right" onClick={next} />
+
+      {/* Dots */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 20 }}>
+        {SLIDES.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => { setAnimate(true); setIndex(i) }}
+            style={{
+              width: i === dotActive ? 24 : 8, height: 8, borderRadius: 4,
+              background: i === dotActive ? '#D41B2C' : '#D1D5DB',
+              border: 'none', cursor: 'pointer', padding: 0,
+              transition: 'width 0.3s, background 0.3s',
+            }}
+          />
+        ))}
       </div>
     </div>
   )
@@ -142,8 +316,22 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ======= POR QUE ESCOLHER ======= */}
+      {/* ======= GALERIA DE TRABALHOS (CARROSSEL) ======= */}
       <section style={{ padding: '96px 0', background: 'white' }}>
+        <div className="site-container">
+          <div style={{ textAlign: 'center', marginBottom: 48 }}>
+            <div className="section-tag">Galeria</div>
+            <h2 className="section-title" style={{ marginBottom: 16 }}>Criatividade em cada detalhe</h2>
+            <p className="section-subtitle" style={{ margin: '0 auto' }}>
+              Confira alguns dos produtos que personalizamos com carinho para nossos clientes.
+            </p>
+          </div>
+          <Carousel />
+        </div>
+      </section>
+
+      {/* ======= POR QUE ESCOLHER ======= */}
+      <section style={{ padding: '96px 0', background: '#F9FAFB' }}>
         <div className="site-container">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 48, alignItems: 'center' }}>
             <div>
