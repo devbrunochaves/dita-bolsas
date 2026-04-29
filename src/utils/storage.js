@@ -225,6 +225,11 @@ export async function savePedido(pedido) {
     .from('pedidos')
     .select('*', { count: 'exact', head: true })
 
+  // Data do pedido — pode ser retroativa (enviada pelo formulário) ou agora
+  const dataPedido = pedido.data
+    ? new Date(pedido.data + 'T12:00:00').toISOString()
+    : new Date().toISOString()
+
   const row = {
     numero:              (count || 0) + 1,
     cliente_id:          pedido.cliente?.id || null,
@@ -236,6 +241,7 @@ export async function savePedido(pedido) {
     status:              'PENDENTE',
     emitido_por:         nomeEmitente,
     user_id:             user?.id || null,
+    created_at:          dataPedido,
     // Financeiro
     status_financeiro:   'pendente',
     comissao_percentual: comissaoPercent,

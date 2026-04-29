@@ -372,6 +372,7 @@ export default function EmitirPedido() {
   const [clienteBusca, setClienteBusca]             = useState('')
   const [clienteSelecionado, setClienteSelecionado] = useState(null)
   const [clienteDropdown, setClienteDropdown]       = useState(false)
+  const [dataPedido, setDataPedido]                 = useState(() => new Date().toISOString().split('T')[0])
   const [itens, setItens]                           = useState([])
   const [desconto, setDesconto]                     = useState('')
   const [observacoes, setObservacoes]               = useState('Orçamento válido pelo período de 30 dias')
@@ -449,7 +450,7 @@ export default function EmitirPedido() {
       desconto:   Number(desconto || 0),
       valorFinal,
       observacoes,
-      data:       new Date().toISOString(),
+      data:       dataPedido,
     }
 
     await savePedido(pedido)
@@ -458,7 +459,7 @@ export default function EmitirPedido() {
     // Mostra modal de sucesso
     setPedidoEmitido(pedido)
 
-    // Limpa o formulário
+    // Limpa o formulário (mantém a data para facilitar emissão retroativa em sequência)
     setClienteBusca('')
     setClienteSelecionado(null)
     setItens([])
@@ -471,6 +472,7 @@ export default function EmitirPedido() {
     setClienteBusca(''); setClienteSelecionado(null)
     setItens([]); setDesconto('')
     setObservacoes('Orçamento válido pelo período de 30 dias')
+    setDataPedido(new Date().toISOString().split('T')[0])
   }
 
   if (loading) return (
@@ -511,6 +513,48 @@ export default function EmitirPedido() {
       </div>
 
       <form onSubmit={handleEmitir}>
+
+        {/* ===== DATA DO PEDIDO ===== */}
+        <div className="ped-card" style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 220 }}>
+              <div style={{ fontSize: 22 }}>📅</div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#1B6E3C' }}>Data do Pedido</div>
+                <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 1 }}>
+                  Preenchida automaticamente com hoje. Altere para lançamentos retroativos.
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input
+                type="date"
+                value={dataPedido}
+                onChange={e => setDataPedido(e.target.value)}
+                max={new Date().toISOString().split('T')[0]}
+                style={{
+                  border: dataPedido !== new Date().toISOString().split('T')[0]
+                    ? '1.5px solid #F59E0B'
+                    : '1.5px solid #D1D5DB',
+                  borderRadius: 8,
+                  padding: '10px 14px',
+                  fontSize: 15,
+                  fontWeight: 700,
+                  color: '#1F2937',
+                  outline: 'none',
+                  background: dataPedido !== new Date().toISOString().split('T')[0] ? '#FFFBEB' : 'white',
+                  cursor: 'pointer',
+                }}
+              />
+              {dataPedido !== new Date().toISOString().split('T')[0] && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, padding: '6px 12px' }}>
+                  <span style={{ fontSize: 14 }}>⚠️</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#92400E' }}>Lançamento retroativo</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* ===== CLIENTE ===== */}
         <div className="ped-card" style={{ marginBottom: 20 }}>
