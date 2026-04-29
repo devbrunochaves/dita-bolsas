@@ -2,6 +2,198 @@ import { useState, useEffect, useRef } from 'react'
 import { getClientes, getProdutos, savePedido } from '../../utils/storage'
 import { gerarPedidoPDF } from '../../utils/pdf'
 
+// ── Modal de sucesso ─────────────────────────────────────────
+function ModalSucesso({ pedido, onFechar }) {
+  const fmtBRL = v => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+  async function handleCompartilhar() {
+    const itensTexto = (pedido.itens || [])
+      .map(i => `• ${i.quantidade}x ${i.nome}${i.observacoes ? ` (${i.observacoes})` : ''} — R$ ${fmtBRL(i.vrTotal)}`)
+      .join('\n')
+
+    const texto = [
+      `🛍️ *DITA BOLSAS — Orçamento/Pedido*`,
+      ``,
+      `👤 Cliente: ${pedido.cliente?.nome || '—'}`,
+      `📅 Data: ${new Date().toLocaleDateString('pt-BR')}`,
+      ``,
+      `📦 *Produtos:*`,
+      itensTexto,
+      ``,
+      pedido.desconto > 0 ? `🏷️ Desconto: - R$ ${fmtBRL(pedido.desconto)}\n` : '',
+      `💰 *Valor Total: R$ ${fmtBRL(pedido.valorFinal)}*`,
+      ``,
+      pedido.observacoes ? `📝 Obs: ${pedido.observacoes}` : '',
+      ``,
+      `_Dita Bolsas — Personalizados com qualidade ✨_`,
+    ].filter(l => l !== '').join('\n')
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Orçamento Dita Bolsas', text: texto })
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          // fallback WhatsApp
+          window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank')
+        }
+      }
+    } else {
+      // fallback para navegadores sem suporte
+      window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank')
+    }
+  }
+
+  return (
+    <div
+      onClick={e => { if (e.target === e.currentTarget) onFechar() }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 2000,
+        background: 'rgba(0,0,0,0.55)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '24px 16px',
+        backdropFilter: 'blur(4px)',
+      }}
+    >
+      <style>{`
+        @keyframes scaleIn {
+          0%   { transform: scale(0.6); opacity: 0; }
+          70%  { transform: scale(1.08); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes checkDraw {
+          0%   { stroke-dashoffset: 100; }
+          100% { stroke-dashoffset: 0; }
+        }
+        @keyframes circleDraw {
+          0%   { stroke-dashoffset: 300; }
+          100% { stroke-dashoffset: 0; }
+        }
+        @keyframes fadeUp {
+          0%   { opacity: 0; transform: translateY(12px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        .modal-sucesso-box {
+          animation: scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards;
+        }
+        .sucesso-circle {
+          stroke-dasharray: 300;
+          stroke-dashoffset: 300;
+          animation: circleDraw 0.6s ease forwards 0.1s;
+        }
+        .sucesso-check {
+          stroke-dasharray: 100;
+          stroke-dashoffset: 100;
+          animation: checkDraw 0.4s ease forwards 0.55s;
+        }
+        .sucesso-texto {
+          opacity: 0;
+          animation: fadeUp 0.4s ease forwards 0.7s;
+        }
+        .sucesso-btn {
+          opacity: 0;
+          animation: fadeUp 0.4s ease forwards 0.85s;
+        }
+      `}</style>
+
+      <div
+        className="modal-sucesso-box"
+        style={{
+          background: 'white',
+          borderRadius: 20,
+          width: '100%',
+          maxWidth: 400,
+          padding: '40px 32px 32px',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.25)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 0,
+          textAlign: 'center',
+        }}
+      >
+        {/* Checkmark animado */}
+        <svg width="100" height="100" viewBox="0 0 100 100" style={{ marginBottom: 20 }}>
+          <circle
+            className="sucesso-circle"
+            cx="50" cy="50" r="46"
+            fill="none"
+            stroke="#1B6E3C"
+            strokeWidth="5"
+            strokeLinecap="round"
+          />
+          <polyline
+            className="sucesso-check"
+            points="28,52 44,66 72,36"
+            fill="none"
+            stroke="#1B6E3C"
+            strokeWidth="6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+
+        {/* Título */}
+        <div className="sucesso-texto">
+          <div style={{ fontSize: 22, fontWeight: 900, color: '#1B6E3C', letterSpacing: 0.5, marginBottom: 6 }}>
+            PEDIDO EMITIDO
+          </div>
+          <div style={{ fontSize: 22, fontWeight: 900, color: '#1F2937', letterSpacing: 0.5, marginBottom: 12 }}>
+            COM SUCESSO!
+          </div>
+          <div style={{ fontSize: 14, color: '#6B7280', marginBottom: 28, lineHeight: 1.5 }}>
+            O PDF foi gerado e salvo.<br />
+            Compartilhe o orçamento com o cliente agora.
+          </div>
+        </div>
+
+        {/* Botão compartilhar */}
+        <div className="sucesso-btn" style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <button
+            onClick={handleCompartilhar}
+            style={{
+              width: '100%',
+              background: 'linear-gradient(135deg, #1B6E3C 0%, #25a05a 100%)',
+              color: 'white',
+              border: 'none',
+              padding: '15px',
+              borderRadius: 12,
+              fontWeight: 800,
+              fontSize: 15,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 10,
+              boxShadow: '0 4px 14px rgba(27,110,60,0.35)',
+              letterSpacing: 0.3,
+            }}
+          >
+            <span style={{ fontSize: 20 }}>📤</span>
+            Enviar para o Cliente
+          </button>
+
+          <button
+            onClick={onFechar}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              color: '#9CA3AF',
+              border: '1.5px solid #E5E7EB',
+              padding: '12px',
+              borderRadius: 12,
+              fontWeight: 600,
+              fontSize: 14,
+              cursor: 'pointer',
+            }}
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Modal de adicionar / editar produto ─────────────────────
 function ModalProduto({ produtos, onAdicionar, onClose, itemInicial }) {
   const modoEdicao = !!itemInicial
@@ -185,7 +377,7 @@ export default function EmitirPedido() {
   const [observacoes, setObservacoes]               = useState('Orçamento válido pelo período de 30 dias')
   const [modalAberto, setModalAberto]               = useState(false)
   const [editIndex, setEditIndex]                   = useState(null)
-  const [success, setSuccess]                       = useState(false)
+  const [pedidoEmitido, setPedidoEmitido]           = useState(null)
   const [loading, setLoading]                       = useState(true)
   const dropdownRef = useRef(null)
 
@@ -204,7 +396,7 @@ export default function EmitirPedido() {
     return () => document.removeEventListener('mousedown', handleOutside)
   }, [])
 
-  // Fecha modal com ESC
+  // Fecha modal produto com ESC
   useEffect(() => {
     function onKey(e) { if (e.key === 'Escape') setModalAberto(false) }
     document.addEventListener('keydown', onKey)
@@ -224,7 +416,6 @@ export default function EmitirPedido() {
 
   function handleAdicionarItem(item) {
     if (editIndex !== null) {
-      // modo edição — substitui o item no índice
       setItens(prev => prev.map((it, i) => i === editIndex ? item : it))
       setEditIndex(null)
     } else {
@@ -263,8 +454,16 @@ export default function EmitirPedido() {
 
     await savePedido(pedido)
     gerarPedidoPDF(pedido)
-    setSuccess(true)
-    setTimeout(() => setSuccess(false), 4000)
+
+    // Mostra modal de sucesso
+    setPedidoEmitido(pedido)
+
+    // Limpa o formulário
+    setClienteBusca('')
+    setClienteSelecionado(null)
+    setItens([])
+    setDesconto('')
+    setObservacoes('Orçamento válido pelo período de 30 dias')
   }
 
   function handleLimpar() {
@@ -285,7 +484,15 @@ export default function EmitirPedido() {
   return (
     <div style={{ maxWidth: 960, margin: '0 auto' }}>
 
-      {/* Modal */}
+      {/* Modal de sucesso */}
+      {pedidoEmitido && (
+        <ModalSucesso
+          pedido={pedidoEmitido}
+          onFechar={() => setPedidoEmitido(null)}
+        />
+      )}
+
+      {/* Modal de produto */}
       {modalAberto && (
         <ModalProduto
           produtos={produtos}
@@ -302,12 +509,6 @@ export default function EmitirPedido() {
         </div>
         <button onClick={handleLimpar} className="ped-btn-secondary" type="button">🗑️ Limpar</button>
       </div>
-
-      {success && (
-        <div style={{ background: '#DCFCE7', border: '1px solid #86EFAC', borderRadius: 10, padding: '14px 18px', marginBottom: 20, color: '#166534', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 10 }}>
-          ✅ Pedido salvo no banco de dados e PDF gerado com sucesso!
-        </div>
-      )}
 
       <form onSubmit={handleEmitir}>
 
@@ -415,16 +616,9 @@ export default function EmitirPedido() {
                   gap: 8px;
                   padding: 0 6px 4px;
                 }
-                .item-col-qtd, .item-col-unit, .item-col-total { }
-                .item-col-header-qtd, .item-col-header-unit, .item-col-header-total { }
-
                 @media (max-width: 768px) {
-                  .item-grid {
-                    grid-template-columns: 52px 1fr 76px !important;
-                  }
-                  .item-grid-header {
-                    grid-template-columns: 52px 1fr 76px !important;
-                  }
+                  .item-grid { grid-template-columns: 52px 1fr 76px !important; }
+                  .item-grid-header { grid-template-columns: 52px 1fr 76px !important; }
                   .item-col-qtd, .item-col-unit, .item-col-total,
                   .item-col-header-qtd, .item-col-header-unit, .item-col-header-total {
                     display: none !important;
@@ -456,7 +650,6 @@ export default function EmitirPedido() {
                   <div className="item-col-qtd" style={{ fontSize: 13, fontWeight: 700, color: '#1F2937', textAlign: 'center' }}>{item.quantidade}</div>
                   <div className="item-col-unit" style={{ fontSize: 13, color: '#6B7280', textAlign: 'right' }}>R$ {fmtBRL(item.vrUnitario)}</div>
                   <div className="item-col-total" style={{ fontSize: 13, fontWeight: 700, color: '#1B6E3C', textAlign: 'right' }}>R$ {fmtBRL(item.vrTotal)}</div>
-                  {/* Botões editar + remover */}
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button type="button" onClick={() => abrirEdicao(i)} title="Editar item" style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid #BFDBFE', background: '#EFF6FF', color: '#2563EB', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✏️</button>
                     <button type="button" onClick={() => removeItem(i)} title="Remover item" style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid #FECACA', background: '#FEF2F2', color: '#DC2626', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
