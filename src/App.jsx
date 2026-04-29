@@ -19,6 +19,7 @@ import PedidosEmitidos from './pages/pedido/PedidosEmitidos'
 import Colaboradores from './pages/pedido/Colaboradores'
 import Financeiro from './pages/pedido/Financeiro'
 import MeuFinanceiro from './pages/pedido/MeuFinanceiro'
+import Producao from './pages/pedido/Producao'
 
 export default function App() {
   return (
@@ -42,6 +43,7 @@ export default function App() {
           <Route index element={<Dashboard />} />
           <Route path="emitir" element={<EmitirPedido />} />
           <Route path="pedidos-emitidos" element={<PedidosEmitidos />} />
+          <Route path="producao" element={<Producao />} />
           <Route path="clientes" element={<ListaClientes />} />
           <Route path="clientes/novo" element={<CadastroCliente />} />
           <Route path="clientes/editar/:id" element={<CadastroCliente />} />

@@ -241,6 +241,8 @@ export async function savePedido(pedido) {
     comissao_percentual: comissaoPercent,
     valor_comissao:      valorComissao,
     comissao_paga:       false,
+    // Produção
+    status_producao:     'PENDENTE',
   }
 
   const { data, error } = await supabase
@@ -314,6 +316,10 @@ function mapPedido(r) {
     comissaoPercentual:  Number(r.comissao_percentual || 0),
     valorComissao:       Number(r.valor_comissao || 0),
     comissaoPaga:        r.comissao_paga      || false,
+    // Produção
+    statusProducao:       r.status_producao        || 'PENDENTE',
+    producaoIniciadaAt:   r.producao_iniciada_at   || null,
+    producaoFinalizadaAt: r.producao_finalizada_at || null,
   }
 }
 
@@ -494,6 +500,73 @@ export async function criarColaborador({ email, password, nome, tipo, comissaoPe
 export async function deleteColaborador(id) {
   const { error } = await supabase.rpc('excluir_colaborador', { profile_id: id })
   check(error, 'deleteColaborador')
+}
+
+// ============================================================
+//  PRODUÇÃO — Kanban
+// ============================================================
+
+/** Busca todos os pedidos para o kanban de produção */
+export async function getPedidosProducao() {
+  const { data, error } = await supabase
+    .from('pedidos')
+    .select('*')
+    .not('status', 'eq', 'CANCELADO')
+    .order('created_at', { ascending: false })
+  check(error, 'getPedidosProducao')
+  return (data || []).map(mapPedido)
+}
+
+/**
+ * Move um pedido para um novo status de produção.
+ * Registra timestamps automaticamente.
+ */
+export async function updateStatusProducao(id, novoStatus, pedidoAtual = null) {
+  const agora = new Date().toISOString()
+  const updates = { status_producao: novoStatus }
+
+  if (novoStatus === 'PENDENTE') {
+    // Volta ao início — limpa timestamps
+    updates.producao_iniciada_at   = null
+    updates.producao_finalizada_at = null
+  } else if (novoStatus === 'EM_PRODUCAO') {
+    // Registra início apenas se ainda não foi marcado
+    if (!pedidoAtual?.producaoIniciadaAt) {
+      updates.producao_iniciada_at = agora
+    }
+    // Se estava em FINALIZADO e voltou, limpa finalização
+    updates.producao_finalizada_at = null
+  } else if (novoStatus === 'FINALIZADO') {
+    // Garante que tem início registrado
+    if (!pedidoAtual?.producaoIniciadaAt) {
+      updates.producao_iniciada_at = agora
+    }
+    updates.producao_finalizada_at = agora
+  } else if (novoStatus === 'ENTREGUE') {
+    // Se não passou por FINALIZADO, registra finalização agora
+    if (!pedidoAtual?.producaoFinalizadaAt) {
+      updates.producao_finalizada_at = agora
+    }
+    // Garante início registrado
+    if (!pedidoAtual?.producaoIniciadaAt) {
+      updates.producao_iniciada_at = agora
+    }
+    // Sincroniza status operacional
+    updates.status = 'ENTREGUE'
+  }
+
+  const { error } = await supabase.from('pedidos').update(updates).eq('id', id)
+  check(error, 'updateStatusProducao')
+
+  // Histórico operacional
+  const { user, profile } = await getUserAndProfile()
+  const LABEL = {
+    PENDENTE:    'Produção: voltou para Pendente',
+    EM_PRODUCAO: 'Produção: entrou em Produção',
+    FINALIZADO:  'Produção: Finalizado',
+    ENTREGUE:    'Produção: Entregue ao cliente',
+  }
+  logHistorico(id, LABEL[novoStatus] || `Produção: ${novoStatus}`, user?.id, profile?.nome)
 }
 
 // ============================================================

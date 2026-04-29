@@ -14,6 +14,7 @@ export default function PedidoLayout() {
     { to: '/pedido',                    label: 'Dashboard',         icon: '📊', exact: true },
     { to: '/pedido/emitir',             label: 'Emitir Pedido',     icon: '📋' },
     { to: '/pedido/pedidos-emitidos',   label: 'Pedidos Emitidos',  icon: '📑' },
+    { to: '/pedido/producao',           label: 'Produção',          icon: '🏭' },
     { to: '/pedido/clientes',           label: 'Clientes',          icon: '👥' },
     { to: '/pedido/produtos',           label: 'Produtos',          icon: '📦' },
     { to: '/pedido/meu-financeiro',     label: 'Meu Financeiro',    icon: '💵' },
