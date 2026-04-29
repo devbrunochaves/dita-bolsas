@@ -558,6 +558,259 @@ function TabComissoes({ pedidos, onAtualizado }) {
   )
 }
 
+// ── Gráfico de Faturamento Mensal ────────────────────────────
+const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
+
+function GraficoFaturamento() {
+  const anoAtual = new Date().getFullYear()
+  const [ano, setAno]           = useState(anoAtual)
+  const [dados, setDados]       = useState(Array(12).fill(null).map(() => ({ fat: 0, rec: 0 })))
+  const [loadG, setLoadG]       = useState(true)
+  const [tooltip, setTooltip]   = useState(null) // { x, y, mes, fat, rec }
+
+  useEffect(() => {
+    setLoadG(true)
+    getFinanceiro({
+      inicio: `${ano}-01-01`,
+      fim:    `${ano}-12-31`,
+    }).then(pedidos => {
+      const meses = Array(12).fill(null).map(() => ({ fat: 0, rec: 0 }))
+      pedidos.forEach(p => {
+        if (!p.dataCriacao) return
+        const mes = new Date(p.dataCriacao).getMonth()
+        const status = resolveStatus(p)
+        if (status !== 'cancelado') {
+          meses[mes].fat += p.valorFinal
+          if (status === 'pago') meses[mes].rec += p.valorFinal
+        }
+      })
+      setDados(meses)
+    }).catch(() => {}).finally(() => setLoadG(false))
+  }, [ano])
+
+  // SVG layout
+  const W = 800, H = 280
+  const padL = 74, padR = 24, padT = 24, padB = 48
+  const cW = W - padL - padR   // 702
+  const cH = H - padT - padB   // 208
+
+  const maxVal = Math.max(...dados.map(d => d.fat), 1)
+  // Arredonda o teto para um número "bonito"
+  const teto = Math.ceil(maxVal / 1000) * 1000 || 1000
+
+  const xPos = i => padL + (i / 11) * cW
+  const yPos = v => padT + cH - (v / teto) * cH
+
+  // Smooth path usando cubic bezier
+  function smoothPath(points) {
+    if (points.length === 0) return ''
+    return points.reduce((path, pt, i) => {
+      if (i === 0) return `M ${pt[0]},${pt[1]}`
+      const prev = points[i - 1]
+      const cpX = (prev[0] + pt[0]) / 2
+      return path + ` C ${cpX},${prev[1]} ${cpX},${pt[1]} ${pt[0]},${pt[1]}`
+    }, '')
+  }
+
+  const ptsFat = dados.map((d, i) => [xPos(i), yPos(d.fat)])
+  const ptsRec = dados.map((d, i) => [xPos(i), yPos(d.rec)])
+
+  // Área preenchida abaixo da linha de faturamento
+  const areaPath = ptsFat.length
+    ? smoothPath(ptsFat) + ` L ${ptsFat[11][0]},${padT + cH} L ${ptsFat[0][0]},${padT + cH} Z`
+    : ''
+
+  // Grade horizontal (5 linhas)
+  const gridLines = [0, 0.25, 0.5, 0.75, 1].map(p => ({
+    y: padT + cH - p * cH,
+    val: p * teto,
+  }))
+
+  const anos = Array.from({ length: 5 }, (_, i) => anoAtual - 2 + i)
+
+  return (
+    <div style={{ background: 'white', borderRadius: 16, border: '1px solid #E5E7EB', padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+      {/* Cabeçalho do gráfico */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h3 style={{ fontSize: 15, fontWeight: 800, color: '#1F2937', margin: 0 }}>📈 Faturamento Mensal</h3>
+          <p style={{ fontSize: 12, color: '#9CA3AF', margin: '4px 0 0' }}>Visão anual do faturamento e valores recebidos</p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          {/* Legenda */}
+          <div style={{ display: 'flex', gap: 16 }}>
+            {[['#1B6E3C', 'Faturamento'], ['#86EFAC', 'Recebido']].map(([cor, label]) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#6B7280', fontWeight: 600 }}>
+                <div style={{ width: 20, height: 3, borderRadius: 2, background: cor }} />
+                {label}
+              </div>
+            ))}
+          </div>
+          {/* Filtro de ano */}
+          <select
+            value={ano}
+            onChange={e => setAno(Number(e.target.value))}
+            style={{ border: '1.5px solid #D1D5DB', borderRadius: 8, padding: '7px 12px', fontSize: 13, fontWeight: 700, color: '#1F2937', outline: 'none', background: 'white', cursor: 'pointer' }}
+          >
+            {anos.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* Gráfico SVG */}
+      {loadG ? (
+        <div style={{ height: H, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 32, height: 32, border: '3px solid #E5E7EB', borderTopColor: '#1B6E3C', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        </div>
+      ) : (
+        <div style={{ position: 'relative' }}>
+          <svg
+            viewBox={`0 0 ${W} ${H}`}
+            style={{ width: '100%', height: 'auto', display: 'block', overflow: 'visible' }}
+            onMouseLeave={() => setTooltip(null)}
+          >
+            <defs>
+              <linearGradient id="gradFat" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"   stopColor="#1B6E3C" stopOpacity="0.15" />
+                <stop offset="100%" stopColor="#1B6E3C" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+
+            {/* Grade horizontal */}
+            {gridLines.map(({ y, val }) => (
+              <g key={y}>
+                <line x1={padL} y1={y} x2={W - padR} y2={y}
+                  stroke="#F3F4F6" strokeWidth="1" strokeDasharray="4 4" />
+                <text x={padL - 8} y={y + 4} textAnchor="end"
+                  fontSize="10" fill="#9CA3AF" fontFamily="Inter, sans-serif">
+                  {val >= 1000 ? `R$${(val/1000).toFixed(val % 1000 === 0 ? 0 : 1)}k` : `R$${val}`}
+                </text>
+              </g>
+            ))}
+
+            {/* Linha base */}
+            <line x1={padL} y1={padT + cH} x2={W - padR} y2={padT + cH}
+              stroke="#E5E7EB" strokeWidth="1.5" />
+
+            {/* Área preenchida */}
+            <path d={areaPath} fill="url(#gradFat)" />
+
+            {/* Linha de faturamento */}
+            <path d={smoothPath(ptsFat)}
+              fill="none" stroke="#1B6E3C" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+            {/* Linha de recebido */}
+            <path d={smoothPath(ptsRec)}
+              fill="none" stroke="#86EFAC" strokeWidth="2" strokeLinecap="round"
+              strokeLinejoin="round" strokeDasharray="6 3" />
+
+            {/* Pontos + área hover invisível */}
+            {dados.map((d, i) => {
+              const x = xPos(i), yF = yPos(d.fat), yR = yPos(d.rec)
+              const isHov = tooltip?.mes === i
+              return (
+                <g key={i}>
+                  {/* Área clicável */}
+                  <rect
+                    x={x - 28} y={padT} width={56} height={cH + padB}
+                    fill="transparent"
+                    onMouseEnter={e => {
+                      const rect = e.currentTarget.closest('svg').getBoundingClientRect()
+                      setTooltip({ mes: i, fat: d.fat, rec: d.rec,
+                        svgX: x, svgY: Math.min(yF, yR) })
+                    }}
+                  />
+                  {/* Dot faturamento */}
+                  <circle cx={x} cy={yF} r={isHov ? 6 : 4}
+                    fill="white" stroke="#1B6E3C" strokeWidth="2.5"
+                    style={{ transition: 'r 0.15s' }} />
+                  {/* Dot recebido (só se > 0) */}
+                  {d.rec > 0 && (
+                    <circle cx={x} cy={yR} r={isHov ? 5 : 3}
+                      fill="white" stroke="#86EFAC" strokeWidth="2"
+                      style={{ transition: 'r 0.15s' }} />
+                  )}
+                  {/* Linha vertical hover */}
+                  {isHov && (
+                    <line x1={x} y1={padT} x2={x} y2={padT + cH}
+                      stroke="#E5E7EB" strokeWidth="1" strokeDasharray="4 3" />
+                  )}
+                </g>
+              )
+            })}
+
+            {/* Labels meses (eixo X) */}
+            {MESES.map((m, i) => (
+              <text key={m} x={xPos(i)} y={H - 8} textAnchor="middle"
+                fontSize="11" fill={tooltip?.mes === i ? '#1B6E3C' : '#9CA3AF'}
+                fontWeight={tooltip?.mes === i ? '700' : '400'}
+                fontFamily="Inter, sans-serif">
+                {m}
+              </text>
+            ))}
+          </svg>
+
+          {/* Tooltip */}
+          {tooltip !== null && (
+            <div style={{
+              position: 'absolute',
+              left: `calc(${(tooltip.svgX / W) * 100}% + 8px)`,
+              top: `calc(${(tooltip.svgY / H) * 100}% - 8px)`,
+              transform: tooltip.svgX > W * 0.7 ? 'translateX(-110%)' : 'translateX(0)',
+              background: '#1F2937',
+              color: 'white',
+              borderRadius: 10,
+              padding: '10px 14px',
+              fontSize: 12,
+              pointerEvents: 'none',
+              zIndex: 10,
+              boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+              minWidth: 140,
+            }}>
+              <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 6 }}>
+                {MESES[tooltip.mes]} {ano}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+                  <span style={{ color: '#9CA3AF' }}>Faturamento</span>
+                  <span style={{ fontWeight: 700, color: '#86EFAC' }}>{fmtBRL(tooltip.fat)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+                  <span style={{ color: '#9CA3AF' }}>Recebido</span>
+                  <span style={{ fontWeight: 700, color: '#4ADE80' }}>{fmtBRL(tooltip.rec)}</span>
+                </div>
+                {tooltip.fat > 0 && (
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 4, marginTop: 2, display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+                    <span style={{ color: '#9CA3AF' }}>Pendente</span>
+                    <span style={{ fontWeight: 700, color: '#FCD34D' }}>{fmtBRL(tooltip.fat - tooltip.rec)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Totalizador anual */}
+      {!loadG && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginTop: 16, paddingTop: 16, borderTop: '1px solid #F3F4F6' }}>
+          {[
+            { label: 'Fat. Total Ano', val: dados.reduce((s, d) => s + d.fat, 0), color: '#1B6E3C' },
+            { label: 'Total Recebido', val: dados.reduce((s, d) => s + d.rec, 0), color: '#16A34A' },
+            { label: 'Melhor Mês', val: Math.max(...dados.map(d => d.fat)), color: '#1D4ED8' },
+            { label: 'Ticket Médio/Mês', val: dados.reduce((s, d) => s + d.fat, 0) / (dados.filter(d => d.fat > 0).length || 1), color: '#92400E' },
+          ].map(({ label, val, color }) => (
+            <div key={label} style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{label}</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color }}>{fmtBRL(val)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Página principal ──────────────────────────────────────────
 export default function Financeiro() {
   const [pedidos, setPedidos]         = useState([])
@@ -776,7 +1029,7 @@ export default function Financeiro() {
         )}
       </div>
 
-      {/* Conteúdo das abas */}
+      {/* ── Conteúdo das abas ── */}
       {loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, gap: 16 }}>
           <div style={{ width: 36, height: 36, border: '4px solid #E5E7EB', borderTopColor: '#1B6E3C', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
@@ -872,6 +1125,9 @@ export default function Financeiro() {
           </div>
         )
       )}
+
+      {/* ── Gráfico anual ── */}
+      <GraficoFaturamento />
     </div>
   )
 }
