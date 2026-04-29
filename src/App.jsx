@@ -18,6 +18,7 @@ import ListaProdutos from './pages/pedido/ListaProdutos'
 import PedidosEmitidos from './pages/pedido/PedidosEmitidos'
 import Colaboradores from './pages/pedido/Colaboradores'
 import Financeiro from './pages/pedido/Financeiro'
+import MeuFinanceiro from './pages/pedido/MeuFinanceiro'
 
 export default function App() {
   return (
@@ -47,6 +48,7 @@ export default function App() {
           <Route path="produtos" element={<ListaProdutos />} />
           <Route path="produtos/novo" element={<CadastroProduto />} />
           <Route path="produtos/editar/:id" element={<CadastroProduto />} />
+          <Route path="meu-financeiro" element={<MeuFinanceiro />} />
           <Route path="colaboradores" element={
             <ProtectedRoute adminOnly>
               <Colaboradores />
