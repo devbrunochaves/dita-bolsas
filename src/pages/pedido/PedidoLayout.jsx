@@ -17,7 +17,9 @@ export default function PedidoLayout() {
     { to: '/pedido/producao',           label: 'Produção',          icon: '🏭' },
     { to: '/pedido/clientes',           label: 'Clientes',          icon: '👥' },
     { to: '/pedido/produtos',           label: 'Produtos',          icon: '📦' },
-    { to: '/pedido/meu-financeiro',     label: 'Meu Financeiro',    icon: '💵' },
+    ...(!isAdmin ? [
+      { to: '/pedido/meu-financeiro', label: 'Meu Financeiro', icon: '💵' },
+    ] : []),
     ...(isAdmin ? [
       { to: '/pedido/colaboradores', label: 'Colaboradores', icon: '🔑' },
       { to: '/pedido/financeiro',    label: 'Financeiro',    icon: '💰' },
