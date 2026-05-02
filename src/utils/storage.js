@@ -64,10 +64,9 @@ export async function getClientes() {
 
   let query = supabase.from('clientes').select('*').order('nome')
 
-  // Vendedor só vê os clientes que ele cadastrou
-  // (clientes sem user_id = antigos, visíveis para todos)
+  // Vendedor vê SOMENTE os clientes que ele mesmo cadastrou
   if (!isAdmin && user) {
-    query = query.or(`user_id.eq.${user.id},user_id.is.null`)
+    query = query.eq('user_id', user.id)
   }
 
   const { data, error } = await query
