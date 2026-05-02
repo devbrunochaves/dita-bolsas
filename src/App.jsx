@@ -8,6 +8,7 @@ import Products from './pages/Products'
 import About from './pages/About'
 import Contact from './pages/Contact'
 import Login from './pages/Login'
+import Estrategia from './pages/Estrategia'
 import PedidoLayout from './pages/pedido/PedidoLayout'
 import Dashboard from './pages/pedido/Dashboard'
 import EmitirPedido from './pages/pedido/EmitirPedido'
@@ -30,6 +31,7 @@ export default function App() {
         <Route path="/produtos" element={<><Navbar /><Products /><Footer /></>} />
         <Route path="/sobre" element={<><Navbar /><About /><Footer /></>} />
         <Route path="/contato" element={<><Navbar /><Contact /><Footer /></>} />
+        <Route path="/estrategia" element={<><Navbar /><Estrategia /><Footer /></>} />
 
         {/* Login */}
         <Route path="/login" element={<Login />} />
