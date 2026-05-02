@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { getClientes, deleteCliente } from '../../utils/storage'
+import { useAuth } from '../../contexts/AuthContext'
 
 // ── Linha de detalhe no modal ────────────────────────────────
 function DetalheItem({ label, value, href }) {
@@ -163,6 +164,7 @@ export default function ListaClientes() {
   const [loading, setLoading]         = useState(true)
   const [clienteSelecionado, setClienteSelecionado] = useState(null)
   const navigate = useNavigate()
+  const { isAdmin } = useAuth()
 
   async function refresh() {
     setLoading(true)
@@ -225,7 +227,7 @@ export default function ListaClientes() {
         </div>
       ) : (
         <div style={{ background: 'white', borderRadius: 14, border: '1px solid #E5E7EB', overflow: 'auto', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-          <table className="ped-table" style={{ minWidth: 700 }}>
+          <table className="ped-table" style={{ minWidth: isAdmin ? 820 : 700 }}>
             <thead>
               <tr>
                 <th>Nome / Razão Social</th>
@@ -233,6 +235,7 @@ export default function ListaClientes() {
                 <th>Cidade / UF</th>
                 <th>Contato</th>
                 <th>WhatsApp</th>
+                {isAdmin && <th>Cadastrado por</th>}
                 <th style={{ textAlign: 'right' }}>Ações</th>
               </tr>
             </thead>
@@ -264,6 +267,22 @@ export default function ListaClientes() {
                           style={{ color: '#1B6E3C', fontWeight: 600 }}>{c.whatsapp}</a>
                       : <span style={{ color: '#D1D5DB' }}>—</span>}
                   </td>
+                  {isAdmin && (
+                    <td style={{ fontSize: 13 }}>
+                      {c.cadastradoPor ? (
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 5,
+                          background: '#F0FDF4', border: '1px solid #86EFAC',
+                          color: '#166534', borderRadius: 100,
+                          padding: '3px 10px', fontSize: 11, fontWeight: 700,
+                        }}>
+                          👤 {c.cadastradoPor}
+                        </span>
+                      ) : (
+                        <span style={{ color: '#D1D5DB', fontSize: 12, fontStyle: 'italic' }}>antigo</span>
+                      )}
+                    </td>
+                  )}
                   <td>
                     <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
                       <button onClick={() => navigate(`/pedido/clientes/editar/${c.id}`)}

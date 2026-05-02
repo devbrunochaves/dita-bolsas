@@ -45,7 +45,7 @@ async function getUserAndProfile() {
     if (!user) return { user: null, profile: null }
     const { data: profile } = await supabase
       .from('profiles')
-      .select('nome, comissao_percentual')
+      .select('nome, tipo, comissao_percentual')
       .eq('id', user.id)
       .single()
     return { user, profile }
@@ -59,10 +59,18 @@ async function getUserAndProfile() {
 // ============================================================
 
 export async function getClientes() {
-  const { data, error } = await supabase
-    .from('clientes')
-    .select('*')
-    .order('nome')
+  const { user, profile } = await getUserAndProfile()
+  const isAdmin = profile?.tipo === 'admin'
+
+  let query = supabase.from('clientes').select('*').order('nome')
+
+  // Vendedor só vê os clientes que ele cadastrou
+  // (clientes sem user_id = antigos, visíveis para todos)
+  if (!isAdmin && user) {
+    query = query.or(`user_id.eq.${user.id},user_id.is.null`)
+  }
+
+  const { data, error } = await query
   check(error, 'getClientes')
   return (data || []).map(mapCliente)
 }
@@ -93,11 +101,17 @@ export async function saveCliente(cliente) {
   }
 
   if (cliente.id) {
+    // Edição: não altera quem cadastrou
     const { data, error } = await supabase
       .from('clientes').update(row).eq('id', cliente.id).select().single()
     check(error, 'saveCliente/update')
     return mapCliente(data)
   } else {
+    // Novo cliente: registra quem cadastrou
+    const { user, profile } = await getUserAndProfile()
+    row.user_id        = user?.id   || null
+    row.cadastrado_por = profile?.nome || user?.email || null
+
     const { data, error } = await supabase
       .from('clientes').insert(row).select().single()
     check(error, 'saveCliente/insert')
@@ -129,18 +143,20 @@ function formatCnpjCpf(value) {
 function mapCliente(r) {
   if (!r) return null
   return {
-    id:       r.id,
-    nome:     r.nome,
-    cnpjCpf:  formatCnpjCpf(r.cnpj_cpf),
-    endereco: r.endereco   || '',
-    telefone: r.telefone   || '',
-    bairro:   r.bairro     || '',
-    cidade:   r.cidade     || '',
-    estado:   r.estado     || 'ES',
-    whatsapp: r.whatsapp   || '',
-    contato:  r.contato    || '',
-    email:    r.email      || '',
-    pgt:      r.pgt        || 'BOLETO',
+    id:            r.id,
+    nome:          r.nome,
+    cnpjCpf:       formatCnpjCpf(r.cnpj_cpf),
+    endereco:      r.endereco      || '',
+    telefone:      r.telefone      || '',
+    bairro:        r.bairro        || '',
+    cidade:        r.cidade        || '',
+    estado:        r.estado        || 'ES',
+    whatsapp:      r.whatsapp      || '',
+    contato:       r.contato       || '',
+    email:         r.email         || '',
+    pgt:           r.pgt           || 'BOLETO',
+    cadastradoPor: r.cadastrado_por || null,
+    userId:        r.user_id        || null,
   }
 }
 
