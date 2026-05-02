@@ -41,7 +41,10 @@ async function logHistoricoFin(pedidoId, acao, userId, userName) {
 // helper: pega usuário logado + profile
 async function getUserAndProfile() {
   try {
-    const { data: { user } } = await supabase.auth.getUser()
+    // getSession() lê do storage local sem fazer chamada de rede
+    // e não usa lock, evitando conflitos em chamadas simultâneas
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user ?? null
     if (!user) return { user: null, profile: null }
     const { data: profile } = await supabase
       .from('profiles')
