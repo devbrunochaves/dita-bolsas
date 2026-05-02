@@ -9,6 +9,7 @@ import About from './pages/About'
 import Contact from './pages/Contact'
 import Login from './pages/Login'
 import Estrategia from './pages/Estrategia'
+import Links from './pages/Links'
 import PedidoLayout from './pages/pedido/PedidoLayout'
 import Dashboard from './pages/pedido/Dashboard'
 import EmitirPedido from './pages/pedido/EmitirPedido'
@@ -32,6 +33,7 @@ export default function App() {
         <Route path="/sobre" element={<><Navbar /><About /><Footer /></>} />
         <Route path="/contato" element={<><Navbar /><Contact /><Footer /></>} />
         <Route path="/estrategia" element={<><Navbar /><Estrategia /><Footer /></>} />
+        <Route path="/links" element={<Links />} />
 
         {/* Login */}
         <Route path="/login" element={<Login />} />
