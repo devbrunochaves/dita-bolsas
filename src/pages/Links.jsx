@@ -30,6 +30,7 @@ const LINKS = [
 
 const RED   = '#D41B2C'
 const DARK  = '#1F2937'
+const WHITE = '#F9FAFB'
 
 export default function Links() {
   return (
@@ -67,7 +68,7 @@ export default function Links() {
           <h1 style={{
             fontSize: 22,
             fontWeight: 800,
-            color: DARK,
+            color: WHITE,
             margin: '0 0 4px',
             letterSpacing: -0.3,
           }}>
@@ -76,7 +77,7 @@ export default function Links() {
 
           <p style={{
             fontSize: 14,
-            color: '#6B7280',
+            color: '#ff7e7e',
             margin: '0 0 6px',
           }}>
             @ditabolsas
@@ -84,11 +85,11 @@ export default function Links() {
 
           <p style={{
             fontSize: 13,
-            color: '#9CA3AF',
+            color: WHITE,
             lineHeight: 1.5,
           }}>
             🎨 Sublimação · DTF · Bordado · Silk<br />
-            📍 Serra/ES · 🚚 Todo o Brasil desde 2002
+            📍 Serra/ES · 🚚 Personalizando o Brasil desde 2002
           </p>
         </div>
 
