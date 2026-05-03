@@ -1,4 +1,4 @@
-const WHATSAPP_NUMBER = '5527997341557'
+const WHATSAPP_NUMBER = '552795263073'
 const WHATSAPP_MSG    = 'Olá! Vim pelo Instagram da Dita e gostaria de pedir um orçamento. Pode me ajudar?'
 
 const LINKS = [
@@ -35,7 +35,7 @@ export default function Links() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(160deg, #FFF5F5 0%, #ffffff 60%, #FFF5F5 100%)',
+      background: 'linear-gradient(160deg, #636363 0%, #343434 60%, #343434 100%)',
       display: 'flex',
       alignItems: 'flex-start',
       justifyContent: 'center',
