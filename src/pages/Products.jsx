@@ -26,13 +26,9 @@ const PRODUCTS = [
   { id: 9,  cat: 'escritorio', emoji: '✏️', name: 'Porta Lápis/Caneta', desc: 'Porta lápis em MDF, acrílico ou verniz com personalização.', tag: 'ESCRITÓRIO' },
   { id: 10, cat: 'escritorio', emoji: '📚', name: 'Estojo Escolar', desc: 'Estojos duplos, simples ou quadrados em várias cores e modelos.', tag: 'ESCRITÓRIO' },
   { id: 11, cat: 'escritorio', emoji: '📋', name: 'Bloco de Anotações', desc: 'Bloco A5 ou A4 com capa personalizada para brindes e eventos.', tag: 'ESCRITÓRIO' },
-  { id: 12, cat: 'escritorio', emoji: '🖊️', name: 'Caneta Personalizada', desc: 'Canetas com logotipo gravado a laser ou silk, ideal para brindes.', tag: 'ESCRITÓRIO' },
 
   // Vestuário
-  { id: 13, cat: 'vestuario', emoji: '👕', name: 'Camiseta Personalizada', desc: 'Camisetas 100% algodão com estampa em silk, sublimação ou bordado.', tag: 'CAMISAS' },
   { id: 14, cat: 'vestuario', emoji: '🧢', name: 'Boné Personalizado', desc: 'Bonés em brim ou nylon com bordado ou silk-screen na frente e lateral.', tag: 'BONÉS' },
-  { id: 15, cat: 'vestuario', emoji: '🧣', name: 'Jaleco e Uniforme', desc: 'Uniformes profissionais com logomarca bordada para sua equipe.', tag: 'VESTUÁRIO' },
-  { id: 16, cat: 'vestuario', emoji: '🩳', name: 'Bermuda e Agasalho', desc: 'Kit completo para equipes esportivas e eventos corporativos.', tag: 'VESTUÁRIO' },
 ]
 
 export default function Products() {
