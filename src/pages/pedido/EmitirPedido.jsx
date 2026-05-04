@@ -7,40 +7,48 @@ function ModalSucesso({ pedido, onFechar }) {
   const fmtBRL = v => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   async function handleCompartilhar() {
+    const pdfFile = pedido.pdfBlob
+      ? new File([pedido.pdfBlob], pedido.pdfNome || 'orcamento-dita-bolsas.pdf', { type: 'application/pdf' })
+      : null
+
+    // Tenta compartilhar o arquivo PDF direto (funciona no celular via WhatsApp, e-mail, etc.)
+    if (pdfFile && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+      try {
+        await navigator.share({
+          files: [pdfFile],
+          title: `Orçamento Dita Bolsas — ${pedido.cliente?.nome || ''}`,
+        })
+        return
+      } catch (err) {
+        if (err.name === 'AbortError') return // usuário cancelou
+        // se falhou por outro motivo, cai no fallback abaixo
+      }
+    }
+
+    // Fallback 1: share só com texto (navegadores sem suporte a files)
     const itensTexto = (pedido.itens || [])
       .map(i => `• ${i.quantidade}x ${i.nome}${i.observacoes ? ` (${i.observacoes})` : ''} — R$ ${fmtBRL(i.vrTotal)}`)
       .join('\n')
-
     const texto = [
-      `🛍️ *DITA BOLSAS — Orçamento/Pedido*`,
-      ``,
+      `🛍️ *DITA BOLSAS — Orçamento*`,
       `👤 Cliente: ${pedido.cliente?.nome || '—'}`,
       `📅 Data: ${new Date().toLocaleDateString('pt-BR')}`,
       ``,
       `📦 *Produtos:*`,
       itensTexto,
-      ``,
-      pedido.desconto > 0 ? `🏷️ Desconto: - R$ ${fmtBRL(pedido.desconto)}\n` : '',
-      `💰 *Valor Total: R$ ${fmtBRL(pedido.valorFinal)}*`,
-      ``,
-      pedido.observacoes ? `📝 Obs: ${pedido.observacoes}` : '',
+      pedido.desconto > 0 ? `🏷️ Desconto: - R$ ${fmtBRL(pedido.desconto)}` : '',
+      `💰 *Total: R$ ${fmtBRL(pedido.valorFinal)}*`,
       ``,
       `_Dita Bolsas — Personalizados com qualidade ✨_`,
-    ].filter(l => l !== '').join('\n')
+    ].filter(Boolean).join('\n')
 
     if (navigator.share) {
-      try {
-        await navigator.share({ title: 'Orçamento Dita Bolsas', text: texto })
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          // fallback WhatsApp
-          window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank')
-        }
-      }
-    } else {
-      // fallback para navegadores sem suporte
-      window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank')
+      try { await navigator.share({ title: 'Orçamento Dita Bolsas', text: texto }); return }
+      catch (err) { if (err.name === 'AbortError') return }
     }
+
+    // Fallback 2: abre WhatsApp Web com o texto
+    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank')
   }
 
   return (
@@ -454,10 +462,10 @@ export default function EmitirPedido() {
     }
 
     await savePedido(pedido)
-    gerarPedidoPDF(pedido)
+    const { blob, nome } = gerarPedidoPDF(pedido)
 
-    // Mostra modal de sucesso
-    setPedidoEmitido(pedido)
+    // Mostra modal de sucesso com o blob do PDF para compartilhar
+    setPedidoEmitido({ ...pedido, pdfBlob: blob, pdfNome: nome })
 
     // Limpa o formulário (mantém a data para facilitar emissão retroativa em sequência)
     setClienteBusca('')

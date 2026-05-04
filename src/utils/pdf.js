@@ -254,10 +254,14 @@ export function gerarPedidoPDF(pedido) {
   doc.text(fmtData(data), PW - MAR, y + 6, { align: 'right' });
 
   // =============================================
-  // SALVAR
+  // SALVAR + retornar blob para compartilhamento
   // =============================================
-  const nomeArq = `pedido-${(cliente?.nome || 'cliente').replace(/\s+/g, '-').toLowerCase()}.pdf`;
+  const nomeArq = `orcamento-${(cliente?.nome || 'cliente').replace(/\s+/g, '-').toLowerCase()}.pdf`;
   doc.save(nomeArq);
+
+  // Retorna o blob para o chamador poder compartilhar via Web Share API
+  const blob = doc.output('blob');
+  return { blob, nome: nomeArq };
 }
 
 // ---- helpers ----
