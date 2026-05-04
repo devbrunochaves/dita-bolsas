@@ -87,7 +87,9 @@ export async function getClienteById(id) {
   return mapCliente(data)
 }
 
-export async function saveCliente(cliente) {
+// userId e cadastradoPor são passados pelo componente (AuthContext),
+// evitando uma consulta extra ao banco que causaria lentidão.
+export async function saveCliente(cliente, { userId, cadastradoPor } = {}) {
   const row = {
     nome:      cliente.nome,
     cnpj_cpf:  cliente.cnpjCpf  || null,
@@ -109,10 +111,9 @@ export async function saveCliente(cliente) {
     check(error, 'saveCliente/update')
     return mapCliente(data)
   } else {
-    // Novo cliente: registra quem cadastrou
-    const { user, profile } = await getUserAndProfile()
-    row.user_id        = user?.id   || null
-    row.cadastrado_por = profile?.nome || user?.email || null
+    // Novo cliente: registra quem cadastrou (sem consulta extra ao banco)
+    row.user_id        = userId        || null
+    row.cadastrado_por = cadastradoPor || null
 
     const { data, error } = await supabase
       .from('clientes').insert(row).select().single()

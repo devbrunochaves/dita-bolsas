@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { saveCliente, getClienteById } from '../../utils/storage'
+import { useAuth } from '../../contexts/AuthContext'
 
 const ESTADOS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']
 const PGTS    = ['BOLETO', 'PIX', 'CARTÃO CRÉDITO', 'CARTÃO DÉBITO', 'DINHEIRO', 'CHEQUE', 'TRANSFERÊNCIA', 'A PRAZO']
@@ -55,6 +56,7 @@ function Field({ label, name, type = 'text', placeholder, options, value, onChan
 export default function CadastroCliente() {
   const { id }   = useParams()
   const navigate = useNavigate()
+  const { user, profile } = useAuth()
   const [form, setForm]     = useState(INITIAL)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved]   = useState(false)
@@ -78,7 +80,10 @@ export default function CadastroCliente() {
     e.preventDefault()
     setSaving(true)
     try {
-      await saveCliente({ ...form })
+      await saveCliente({ ...form }, {
+        userId:        user?.id          || null,
+        cadastradoPor: profile?.nome     || user?.email || null,
+      })
       setSaved(true)
       setTimeout(() => navigate('/pedido/clientes'), 1500)
     } catch (err) {
