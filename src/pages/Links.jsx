@@ -1,4 +1,4 @@
-const WHATSAPP_NUMBER = '552795263073'
+const WHATSAPP_NUMBER = '5527995263073'
 const WHATSAPP_MSG    = 'Olá! Vim pelo Instagram da Dita e gostaria de pedir um orçamento. Pode me ajudar?'
 
 const LINKS = [
