@@ -36,6 +36,7 @@ export function gerarPedidoPDF(pedido) {
   const VLGRAY = [245, 245, 245];
 
   let y = 12;
+  const cL = MAR + 3; // margem interna esquerda (usada no cliente, observações e rodapé)
 
   // =============================================
   // CABEÇALHO — Logo + dados empresa + título
@@ -110,7 +111,7 @@ export function gerarPedidoPDF(pedido) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
 
-  const cL = MAR + 3;        // início coluna esquerda
+  // cL já declarado no escopo global da função (MAR + 3)
   const cR = MAR + W * 0.50; // início coluna direita
 
   // Largura máxima para valores (evita overflow entre colunas)
@@ -254,9 +255,9 @@ export function gerarPedidoPDF(pedido) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(...BLACK);
-  doc.text('Observações: ', col1, y + 6);
+  doc.text('Observações: ', cL, y + 6);
   doc.setFont('helvetica', 'normal');
-  doc.text(observacoes || 'Orçamento válido pelo período de 30 dias', col1 + 24, y + 6);
+  doc.text(observacoes || 'Orçamento válido pelo período de 30 dias', cL + 24, y + 6);
   y += 24;
 
   // =============================================
@@ -265,11 +266,11 @@ export function gerarPedidoPDF(pedido) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...BLACK);
-  doc.text('Ass. Responsável: ', col1, y + 6);
+  doc.text('Ass. Responsável: ', cL, y + 6);
   // linha de assinatura
   doc.setDrawColor(...BLACK);
   doc.setLineWidth(0.3);
-  doc.line(col1 + 35, y + 6.5, col1 + 110, y + 6.5);
+  doc.line(cL + 35, y + 6.5, cL + 110, y + 6.5);
 
   doc.text(fmtData(data), PW - MAR, y + 6, { align: 'right' });
 
