@@ -29,13 +29,12 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true
 
-    // Safety timeout: garante que o loading some em até 8s no pior caso
+    // Safety timeout de 30 s — free tier pode demorar para acordar,
+    // mas nesse caso o INITIAL_SESSION abaixo já libera a UI antes disso.
     const safetyTimeout = setTimeout(() => {
       if (mounted) setLoading(false)
-    }, 8000)
+    }, 30000)
 
-    // onAuthStateChange é a fonte de verdade — inclui INITIAL_SESSION
-    // que no Supabase v2 dispara imediatamente com a sessão do localStorage
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return
@@ -48,6 +47,20 @@ export function AuthProvider({ children }) {
           return
         }
 
+        // ── INITIAL_SESSION: restauração ao reabrir a aba ─────────────
+        // O JWT já está no localStorage — a sessão é válida sem ir ao banco.
+        // Liberamos a UI imediatamente e buscamos o profile em background.
+        if (event === 'INITIAL_SESSION') {
+          clearTimeout(safetyTimeout)
+          if (mounted) { setUser(u); setLoading(false) }
+          // Profile em background — não bloqueia a navegação
+          fetchProfile(u.id).then(p => {
+            if (mounted) setProfile(p)
+          })
+          return
+        }
+
+        // ── SIGN_IN / TOKEN_REFRESHED / etc: aguarda o profile ────────
         const p = await fetchProfile(u.id)
         if (!mounted) return
         clearTimeout(safetyTimeout)
