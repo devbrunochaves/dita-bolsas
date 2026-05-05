@@ -277,7 +277,7 @@ export function gerarPedidoPDF(pedido) {
   // =============================================
   // SALVAR + retornar blob para compartilhamento
   // =============================================
-  const nomeArq = `orcamento-${(cliente?.nome || 'cliente').replace(/\s+/g, '-').toLowerCase()}.pdf`;
+  const nomeArq = `Pedido-${(cliente?.nome || 'cliente').replace(/\s+/g, '-').toLowerCase()}.pdf`;
   doc.save(nomeArq);
 
   // Retorna o blob para o chamador poder compartilhar via Web Share API
