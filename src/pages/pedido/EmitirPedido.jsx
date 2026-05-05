@@ -388,6 +388,8 @@ export default function EmitirPedido() {
   const [editIndex, setEditIndex]                   = useState(null)
   const [pedidoEmitido, setPedidoEmitido]           = useState(null)
   const [loading, setLoading]                       = useState(true)
+  const [emitindo, setEmitindo]                     = useState(false)
+  const [erroEmitir, setErroEmitir]                 = useState('')
   const dropdownRef = useRef(null)
 
   useEffect(() => {
@@ -452,6 +454,9 @@ export default function EmitirPedido() {
     if (!clienteSelecionado) { alert('Selecione um cliente antes de emitir.'); return }
     if (!itens.length) { alert('Adicione pelo menos um produto.'); return }
 
+    setEmitindo(true)
+    setErroEmitir('')
+
     const pedido = {
       cliente:    clienteSelecionado,
       itens,
@@ -461,18 +466,25 @@ export default function EmitirPedido() {
       data:       dataPedido,
     }
 
-    await savePedido(pedido)
-    const { blob, nome } = gerarPedidoPDF(pedido)
+    try {
+      await savePedido(pedido)
+      const { blob, nome } = gerarPedidoPDF(pedido)
 
-    // Mostra modal de sucesso com o blob do PDF para compartilhar
-    setPedidoEmitido({ ...pedido, pdfBlob: blob, pdfNome: nome })
+      // Mostra modal de sucesso com o blob do PDF para compartilhar
+      setPedidoEmitido({ ...pedido, pdfBlob: blob, pdfNome: nome })
 
-    // Limpa o formulário (mantém a data para facilitar emissão retroativa em sequência)
-    setClienteBusca('')
-    setClienteSelecionado(null)
-    setItens([])
-    setDesconto('')
-    setObservacoes('Orçamento válido pelo período de 30 dias')
+      // Limpa o formulário (mantém a data para facilitar emissão retroativa em sequência)
+      setClienteBusca('')
+      setClienteSelecionado(null)
+      setItens([])
+      setDesconto('')
+      setObservacoes('Orçamento válido pelo período de 30 dias')
+    } catch (err) {
+      console.error('[EmitirPedido] Erro ao emitir:', err)
+      setErroEmitir(err.message || 'Erro desconhecido ao salvar o pedido.')
+    } finally {
+      setEmitindo(false)
+    }
   }
 
   function handleLimpar() {
@@ -748,15 +760,32 @@ export default function EmitirPedido() {
           </div>
         </div>
 
+        {/* Mensagem de erro ao emitir */}
+        {erroEmitir && (
+          <div style={{ background: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: '#991B1B' }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>❌ Erro ao emitir pedido</div>
+            <div style={{ fontSize: 13 }}>{erroEmitir}</div>
+            <div style={{ fontSize: 12, marginTop: 6, color: '#7F1D1D' }}>
+              Se a mensagem falar em "tempo limite", o banco pode estar em modo de espera. Aguarde 30 s e tente novamente.
+            </div>
+          </div>
+        )}
+
         {/* BOTÃO EMITIR */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-          <button type="button" onClick={handleLimpar} className="ped-btn-secondary">Cancelar</button>
-          <button type="submit" style={{
-            background: '#1B6E3C', color: 'white', border: 'none', padding: '14px 36px', borderRadius: 10,
-            fontWeight: 800, fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
-            boxShadow: '0 4px 14px rgba(27,110,60,0.35)', letterSpacing: 0.5,
+          <button type="button" onClick={handleLimpar} className="ped-btn-secondary" disabled={emitindo}>Cancelar</button>
+          <button type="submit" disabled={emitindo} style={{
+            background: emitindo ? '#6B7280' : '#1B6E3C', color: 'white', border: 'none', padding: '14px 36px', borderRadius: 10,
+            fontWeight: 800, fontSize: 16, cursor: emitindo ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+            boxShadow: emitindo ? 'none' : '0 4px 14px rgba(27,110,60,0.35)', letterSpacing: 0.5,
+            opacity: emitindo ? 0.8 : 1, transition: 'all 0.2s',
           }}>
-            📥 EMITIR PEDIDO (PDF)
+            {emitindo ? (
+              <>
+                <div style={{ width: 18, height: 18, border: '3px solid rgba(255,255,255,0.4)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                Salvando pedido...
+              </>
+            ) : '📥 EMITIR PEDIDO (PDF)'}
           </button>
         </div>
       </form>

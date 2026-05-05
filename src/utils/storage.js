@@ -293,8 +293,11 @@ export async function savePedido(pedido) {
     status_producao:     'PENDENTE',
   }
 
-  const { data, error } = await supabase
-    .from('pedidos').insert(row).select().single()
+  const { data, error } = await withTimeout(
+    supabase.from('pedidos').insert(row).select().single(),
+    15000,
+    'O banco demorou demais para salvar o pedido. Verifique sua conexão e tente novamente.'
+  )
   check(error, 'savePedido')
 
   // Histórico operacional
