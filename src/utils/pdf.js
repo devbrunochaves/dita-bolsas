@@ -67,7 +67,7 @@ export function gerarPedidoPDF(pedido) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
   doc.setTextColor(...RED);
-  doc.text('ORÇAMENTO', PW - MAR, y + 8, { align: 'right' });
+  doc.text('PEDIDO', PW - MAR, y + 8, { align: 'right' });
 
   y += 26;
 
