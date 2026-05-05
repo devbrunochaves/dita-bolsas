@@ -198,8 +198,8 @@ export function gerarPedidoPDF(pedido) {
           { content: fmtBRL(item.vrTotal),          styles: { halign: 'right' } },
         ]
       }),
-      // linhas em branco para parecer o modelo (mínimo 18 linhas)
-      ...Array(Math.max(0, 18 - itens.length)).fill([
+      // linhas em branco para parecer o modelo (mínimo 13 linhas — cabe numa página)
+      ...Array(Math.max(0, 13 - itens.length)).fill([
         { content: '' }, { content: '' }, { content: '' }, { content: '' }, { content: '' }
       ]),
       // rodapé de totais
