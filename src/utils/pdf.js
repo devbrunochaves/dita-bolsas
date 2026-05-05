@@ -97,52 +97,72 @@ export function gerarPedidoPDF(pedido) {
   y += 13;
 
   // =============================================
-  // DADOS DO CLIENTE
+  // DADOS DO CLIENTE — grade 2 colunas × 5 linhas
   // =============================================
+  const lh  = 5.5;  // espaçamento entre linhas
+  const BOX = 38;   // altura do box
+
   doc.setFillColor(255, 255, 255);
   doc.setDrawColor(...LGRAY);
   doc.setLineWidth(0.3);
-  doc.roundedRect(MAR, y, W, 28, 1, 1, 'FD');
-
-  const lh = 5.5; // line height
-  const col1 = MAR + 3;
-  const col2 = MAR + W * 0.45;
-  const col3 = MAR + W * 0.7;
+  doc.roundedRect(MAR, y, W, BOX, 1, 1, 'FD');
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
 
-  // Linha 1: Nome | CNPJ/CPF
-  doc.setTextColor(...GRAY); doc.text('Nome:', col1, y + lh);
-  doc.setTextColor(...BLACK); doc.text(cliente?.nome || '-', col1 + 12, y + lh);
-  doc.setTextColor(...GRAY); doc.text('CNPJ/CPF:', col2, y + lh);
-  doc.setTextColor(...BLACK); doc.text(cliente?.cnpjCpf || '-', col2 + 18, y + lh);
+  const cL = MAR + 3;        // início coluna esquerda
+  const cR = MAR + W * 0.50; // início coluna direita
 
-  // Linha 2: Endereço | Telefone | Bairro
-  doc.setTextColor(...GRAY); doc.text('Endereço:', col1, y + lh * 2.3);
-  doc.setTextColor(...BLACK); doc.text(cliente?.endereco || '-', col1 + 18, y + lh * 2.3);
-  doc.setTextColor(...GRAY); doc.text('Telefone:', col2, y + lh * 2.3);
-  doc.setTextColor(...BLACK); doc.text(formatTel(cliente?.telefone), col2 + 18, y + lh * 2.3);
-  doc.setTextColor(...GRAY); doc.text('Bairro:', col3, y + lh * 2.3);
-  doc.setTextColor(...BLACK); doc.text(cliente?.bairro || '-', col3 + 14, y + lh * 2.3);
+  // Largura máxima para valores (evita overflow entre colunas)
+  const maxVal = W * 0.46;
 
-  // Linha 3: Cidade | UF | Whatsapp | Contato
-  doc.setTextColor(...GRAY); doc.text('Cidade:', col1, y + lh * 3.6);
-  doc.setTextColor(...BLACK); doc.text(cliente?.cidade || '-', col1 + 13, y + lh * 3.6);
-  doc.setTextColor(...GRAY); doc.text('UF:', col2, y + lh * 3.6);
-  doc.setTextColor(...BLACK); doc.text(cliente?.estado || 'ES', col2 + 7, y + lh * 3.6);
-  doc.setTextColor(...GRAY); doc.text('Whatsapp:', col2 + 22, y + lh * 3.6);
-  doc.setTextColor(...BLACK); doc.text(formatTel(cliente?.whatsapp), col2 + 38, y + lh * 3.6);
-  doc.setTextColor(...GRAY); doc.text('Contato:', col3, y + lh * 3.6);
-  doc.setTextColor(...BLACK); doc.text(cliente?.contato || '-', col3 + 16, y + lh * 3.6);
+  // helper: retorna a primeira linha que cabe em maxWidth mm
+  function fit(text, maxWidth) {
+    if (!text) return '-';
+    const lines = doc.splitTextToSize(String(text), maxWidth);
+    return lines[0] || '-';
+  }
 
-  // Linha 4: Email | PGT
-  doc.setTextColor(...GRAY); doc.text('Email:', col1, y + lh * 4.9);
-  doc.setTextColor(...BLACK); doc.text(cliente?.email || '-', col1 + 11, y + lh * 4.9);
-  doc.setTextColor(...GRAY); doc.text('PGT:', col3, y + lh * 4.9);
-  doc.setTextColor(...BLACK); doc.text(cliente?.pgt || 'BOLETO', col3 + 9, y + lh * 4.9);
+  const r1 = y + lh;          // linha 1
+  const r2 = y + lh * 2.25;   // linha 2
+  const r3 = y + lh * 3.50;   // linha 3
+  const r4 = y + lh * 4.75;   // linha 4
+  const r5 = y + lh * 6.00;   // linha 5
 
-  y += 32;
+  // ── Linha 1: Nome | CNPJ/CPF ──────────────────────────
+  doc.setTextColor(...GRAY);  doc.text('Nome:',     cL,      r1);
+  doc.setTextColor(...BLACK); doc.text(fit(cliente?.nome, maxVal), cL + 12, r1);
+  doc.setTextColor(...GRAY);  doc.text('CNPJ/CPF:', cR,      r1);
+  doc.setTextColor(...BLACK); doc.text(cliente?.cnpjCpf || '-', cR + 18, r1);
+
+  // ── Linha 2: Endereço | Bairro ────────────────────────
+  doc.setTextColor(...GRAY);  doc.text('Endereço:', cL,      r2);
+  doc.setTextColor(...BLACK); doc.text(fit(cliente?.endereco, maxVal - 6), cL + 18, r2);
+  doc.setTextColor(...GRAY);  doc.text('Bairro:',   cR,      r2);
+  doc.setTextColor(...BLACK); doc.text(fit(cliente?.bairro, maxVal), cR + 13, r2);
+
+  // ── Linha 3: Cidade / UF | Telefone ──────────────────
+  doc.setTextColor(...GRAY);  doc.text('Cidade / UF:', cL, r3);
+  doc.setTextColor(...BLACK); doc.text(
+    `${fit(cliente?.cidade, 30) } / ${cliente?.estado || 'ES'}`,
+    cL + 22, r3
+  );
+  doc.setTextColor(...GRAY);  doc.text('Telefone:', cR,      r3);
+  doc.setTextColor(...BLACK); doc.text(formatTel(cliente?.telefone), cR + 18, r3);
+
+  // ── Linha 4: Whatsapp | Contato ───────────────────────
+  doc.setTextColor(...GRAY);  doc.text('Whatsapp:', cL,      r4);
+  doc.setTextColor(...BLACK); doc.text(formatTel(cliente?.whatsapp), cL + 18, r4);
+  doc.setTextColor(...GRAY);  doc.text('Contato:',  cR,      r4);
+  doc.setTextColor(...BLACK); doc.text(fit(cliente?.contato, maxVal), cR + 16, r4);
+
+  // ── Linha 5: Email | PGT ──────────────────────────────
+  doc.setTextColor(...GRAY);  doc.text('Email:', cL,      r5);
+  doc.setTextColor(...BLACK); doc.text(fit(cliente?.email, maxVal), cL + 11, r5);
+  doc.setTextColor(...GRAY);  doc.text('PGT:',   cR,      r5);
+  doc.setTextColor(...BLACK); doc.text(cliente?.pgt || 'BOLETO', cR + 9, r5);
+
+  y += BOX + 4;
 
   // =============================================
   // TABELA DE PRODUTOS
