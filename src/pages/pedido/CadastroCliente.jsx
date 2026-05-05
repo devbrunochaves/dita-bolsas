@@ -60,6 +60,7 @@ export default function CadastroCliente() {
   const [form, setForm]     = useState(INITIAL)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved]   = useState(false)
+  const [erro, setErro]     = useState('')
   const isEdit = Boolean(id)
 
   useEffect(() => {
@@ -79,6 +80,7 @@ export default function CadastroCliente() {
   async function handleSubmit(e) {
     e.preventDefault()
     setSaving(true)
+    setErro('')
     try {
       await saveCliente({ ...form }, {
         userId:        user?.id          || null,
@@ -87,7 +89,8 @@ export default function CadastroCliente() {
       setSaved(true)
       setTimeout(() => navigate('/pedido/clientes'), 1500)
     } catch (err) {
-      alert('Erro ao salvar: ' + err.message)
+      console.error('[CadastroCliente] Erro ao salvar:', err)
+      setErro(err.message || 'Erro desconhecido ao salvar o cliente.')
     } finally {
       setSaving(false)
     }
@@ -113,6 +116,16 @@ export default function CadastroCliente() {
       {saved && (
         <div style={{ background: '#DCFCE7', border: '1px solid #86EFAC', borderRadius: 10, padding: '12px 16px', marginBottom: 20, color: '#166534', fontWeight: 600 }}>
           ✅ Cliente {isEdit ? 'atualizado' : 'cadastrado'} com sucesso no banco de dados! Redirecionando...
+        </div>
+      )}
+
+      {erro && (
+        <div style={{ background: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: 10, padding: '12px 16px', marginBottom: 20, color: '#991B1B' }}>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>❌ Erro ao salvar</div>
+          <div style={{ fontSize: 13 }}>{erro}</div>
+          <div style={{ fontSize: 12, marginTop: 6, color: '#7F1D1D' }}>
+            Se a mensagem falar em "tempo limite", o banco pode estar em modo de espera (plano gratuito Supabase). Aguarde 30 s e tente novamente.
+          </div>
         </div>
       )}
 

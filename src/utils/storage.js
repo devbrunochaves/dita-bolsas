@@ -14,6 +14,14 @@ function check(error, context) {
   }
 }
 
+// helper: rejeita se a promise demorar mais de `ms` ms
+function withTimeout(promise, ms = 12000, msg = 'O banco demorou demais para responder. Verifique sua conexão e tente novamente.') {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(msg)), ms)
+    Promise.resolve(promise).then(resolve, reject).finally(() => clearTimeout(timer))
+  })
+}
+
 // helper: registra no histórico do pedido (fire-and-forget)
 async function logHistorico(pedidoId, acao, userId, userName) {
   try {
@@ -106,8 +114,9 @@ export async function saveCliente(cliente, { userId, cadastradoPor } = {}) {
 
   if (cliente.id) {
     // Edição: não altera quem cadastrou
-    const { data, error } = await supabase
-      .from('clientes').update(row).eq('id', cliente.id).select().single()
+    const { data, error } = await withTimeout(
+      supabase.from('clientes').update(row).eq('id', cliente.id).select().single()
+    )
     check(error, 'saveCliente/update')
     return mapCliente(data)
   } else {
@@ -115,8 +124,22 @@ export async function saveCliente(cliente, { userId, cadastradoPor } = {}) {
     row.user_id        = userId        || null
     row.cadastrado_por = cadastradoPor || null
 
-    const { data, error } = await supabase
-      .from('clientes').insert(row).select().single()
+    let { data, error } = await withTimeout(
+      supabase.from('clientes').insert(row).select().single()
+    )
+
+    // Fallback: se as colunas user_id/cadastrado_por ainda não existem no banco
+    // (migração supabase-clientes-v2.sql não foi rodada), tenta sem elas
+    if (error && (error.message?.includes('user_id') || error.message?.includes('cadastrado_por'))) {
+      console.warn('[storage] Colunas user_id/cadastrado_por ausentes — salvando sem elas. Rode supabase-clientes-v2.sql!')
+      const { user_id: _uid, cadastrado_por: _cpor, ...rowBase } = row
+      const fallback = await withTimeout(
+        supabase.from('clientes').insert(rowBase).select().single()
+      )
+      data  = fallback.data
+      error = fallback.error
+    }
+
     check(error, 'saveCliente/insert')
     return mapCliente(data)
   }
