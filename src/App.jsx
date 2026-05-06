@@ -23,6 +23,7 @@ import Financeiro from './pages/pedido/Financeiro'
 import MeuFinanceiro from './pages/pedido/MeuFinanceiro'
 import Producao from './pages/pedido/Producao'
 import GerenciarSite from './pages/pedido/GerenciarSite'
+import ProductDetail from './pages/ProductDetail'
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
         {/* Site institucional — público */}
         <Route path="/" element={<><Navbar /><Home /><Footer /></>} />
         <Route path="/produtos" element={<><Navbar /><Products /><Footer /></>} />
+        <Route path="/produto/:slug" element={<><Navbar /><ProductDetail /><Footer /></>} />
         <Route path="/sobre" element={<><Navbar /><About /><Footer /></>} />
         <Route path="/contato" element={<><Navbar /><Contact /><Footer /></>} />
         <Route path="/estrategia" element={<><Navbar /><Estrategia /><Footer /></>} />

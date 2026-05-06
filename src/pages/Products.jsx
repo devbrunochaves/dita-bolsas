@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { getSiteProdutos } from '../utils/storage'
+import { useSearchParams, useNavigate } from 'react-router-dom'
+import { getSiteProdutos, slugify } from '../utils/storage'
 
 // Faixas de preço fallback por categoria
 const PRODUTOS_FALLBACK = [
@@ -123,11 +123,13 @@ function ModalEspiar({ produto, onClose }) {
 
 // ── Card de produto ────────────────────────────────────────────
 function ProdutoCard({ produto, onEspiar }) {
+  const navigate = useNavigate()
   const preco = produto.preco_exibicao
 
   return (
     <div
-      style={{ background: 'white', borderRadius: 16, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,.07)', transition: 'transform .3s, box-shadow .3s', display: 'flex', flexDirection: 'column' }}
+      onClick={() => navigate(`/produto/${slugify(produto.nome)}`)}
+      style={{ background: 'white', borderRadius: 16, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,.07)', transition: 'transform .3s, box-shadow .3s', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}
       onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 14px 32px rgba(0,0,0,.12)' }}
       onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,.07)' }}
     >
@@ -164,12 +166,12 @@ function ProdutoCard({ produto, onEspiar }) {
             }
           </div>
           <button
-            onClick={() => onEspiar(produto)}
+            onClick={() => navigate(`/produto/${slugify(produto.nome)}`)}
             style={{ background: '#1F2937', color: 'white', border: 'none', borderRadius: 10, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'background .2s' }}
             onMouseEnter={e => e.currentTarget.style.background = '#D41B2C'}
             onMouseLeave={e => e.currentTarget.style.background = '#1F2937'}
           >
-            👁 Espiar
+            Ver Produto →
           </button>
         </div>
       </div>

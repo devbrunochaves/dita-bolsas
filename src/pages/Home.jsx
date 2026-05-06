@@ -1,6 +1,6 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { getBanners, getSiteProdutos } from '../utils/storage'
+import { getBanners, getSiteProdutos, slugify } from '../utils/storage'
 
 // ---- Contador animado ----
 function Counter({ target, suffix = '', prefix = '' }) {
@@ -172,10 +172,12 @@ const PRODUTOS_FALLBACK = [
 ]
 
 function ProductCard({ produto, onEspiar }) {
+  const navigate = useNavigate()
   const preco = produto?.preco_exibicao
 
   return (
     <div
+      onClick={() => navigate(`/produto/${slugify(produto.nome)}`)}
       style={{
         background: 'white', borderRadius: 16, overflow: 'hidden',
         boxShadow: '0 4px 20px rgba(0,0,0,0.07)',
@@ -225,7 +227,7 @@ function ProductCard({ produto, onEspiar }) {
             }
           </div>
           <button
-            onClick={() => onEspiar(produto)}
+            onClick={() => navigate(`/produto/${slugify(produto.nome)}`)}
             style={{
               background: '#1F2937', color: 'white',
               border: 'none', borderRadius: 10,
@@ -236,7 +238,7 @@ function ProductCard({ produto, onEspiar }) {
             onMouseEnter={e => e.currentTarget.style.background = '#D41B2C'}
             onMouseLeave={e => e.currentTarget.style.background = '#1F2937'}
           >
-            👁 Espiar
+            Ver Produto →
           </button>
         </div>
       </div>

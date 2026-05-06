@@ -705,6 +705,17 @@ export async function reordenarBanners(ids) {
 
 // ── PRODUTOS DO SITE ─────────────────────────────────────────
 
+// Converte nome em slug URL amigável: "Bolsa Escolar" → "bolsa-escolar"
+export function slugify(texto) {
+  return String(texto)
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+}
+
 export async function getSiteProdutos({ somenteAtivos = false, categoria } = {}) {
   let q = supabase.from('site_produtos').select('*').order('ordem')
   if (somenteAtivos) q = q.eq('ativo', true)
