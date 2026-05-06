@@ -628,22 +628,33 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
+    let cancelled = false
+    // Fallback automático após 8s (Supabase free-tier pode estar dormindo)
+    const fallbackTimer = setTimeout(() => {
+      if (!cancelled) setProdutos(prev => prev === null ? [] : prev)
+    }, 8000)
+
     getSiteProdutos({ somenteAtivos: true })
       .then(rows => {
+        if (cancelled) return
         if (rows && rows.length) {
-          // injeta preco_exibicao (menor faixa) em cada produto
-          setProdutos(rows.map(p => ({ ...p, preco_exibicao: menorPreco(p.faixas_preco) })))
+          // Embaralha para ordem aleatória a cada visita
+          const shuffled = [...rows].sort(() => Math.random() - 0.5)
+          setProdutos(shuffled.map(p => ({ ...p, preco_exibicao: menorPreco(p.faixas_preco) })))
         } else {
-          setProdutos([]) // banco vazio → vai usar fallback
+          setProdutos([])
         }
       })
-      .catch(() => setProdutos([]))
+      .catch(() => { if (!cancelled) setProdutos([]) })
+      .finally(() => clearTimeout(fallbackTimer))
+
+    return () => { cancelled = true; clearTimeout(fallbackTimer) }
   }, [])
 
-  // Decide quais cards exibir
+  // Decide quais cards exibir (fallback também embaralhado)
   const listaCards = (produtos && produtos.length > 0)
     ? produtos
-    : PRODUTOS_FALLBACK
+    : [...PRODUTOS_FALLBACK].sort(() => Math.random() - 0.5)
 
   return (
     <main style={{ paddingTop: 68 }}>
