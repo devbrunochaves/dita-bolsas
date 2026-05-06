@@ -618,8 +618,11 @@ function menorPreco(faixas) {
 
 export default function Home() {
   const [dbBanners,  setDbBanners]  = useState([])
-  const [produtos,   setProdutos]   = useState(null)   // null = carregando
-  const [espiarProd, setEspiarProd] = useState(null)   // produto no modal
+  // Inicia já com o fallback embaralhado — sem skeleton, sem espera
+  const [produtos,   setProdutos]   = useState(
+    () => [...PRODUTOS_FALLBACK].sort(() => Math.random() - 0.5)
+  )
+  const [espiarProd, setEspiarProd] = useState(null)
 
   useEffect(() => {
     getBanners(true)
@@ -629,32 +632,20 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false
-    // Fallback automático após 8s (Supabase free-tier pode estar dormindo)
-    const fallbackTimer = setTimeout(() => {
-      if (!cancelled) setProdutos(prev => prev === null ? [] : prev)
-    }, 8000)
-
+    // Tenta buscar do banco em background — substitui o fallback se encontrar
     getSiteProdutos({ somenteAtivos: true })
       .then(rows => {
-        if (cancelled) return
-        if (rows && rows.length) {
-          // Embaralha para ordem aleatória a cada visita
-          const shuffled = [...rows].sort(() => Math.random() - 0.5)
-          setProdutos(shuffled.map(p => ({ ...p, preco_exibicao: menorPreco(p.faixas_preco) })))
-        } else {
-          setProdutos([])
-        }
+        if (cancelled || !rows?.length) return
+        const shuffled = [...rows].sort(() => Math.random() - 0.5)
+        setProdutos(shuffled.map(p => ({ ...p, preco_exibicao: menorPreco(p.faixas_preco) })))
       })
-      .catch(() => { if (!cancelled) setProdutos([]) })
-      .finally(() => clearTimeout(fallbackTimer))
+      .catch(() => {}) // silencioso — mantém o fallback
 
-    return () => { cancelled = true; clearTimeout(fallbackTimer) }
+    return () => { cancelled = true }
   }, [])
 
-  // Decide quais cards exibir (fallback também embaralhado)
-  const listaCards = (produtos && produtos.length > 0)
-    ? produtos
-    : [...PRODUTOS_FALLBACK].sort(() => Math.random() - 0.5)
+  // Mostra sempre exatamente 8 cards na home
+  const listaCards = produtos.slice(0, 8)
 
   return (
     <main style={{ paddingTop: 68 }}>
@@ -745,31 +736,12 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Grid de cards */}
-          {produtos === null
-            ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 24 }}>
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} style={{ background: 'white', borderRadius: 16, overflow: 'hidden', height: 320, animation: 'pulse 1.5s ease infinite' }}>
-                    <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }`}</style>
-                    <div style={{ height: 180, background: '#F3F4F6' }} />
-                    <div style={{ padding: 18 }}>
-                      <div style={{ height: 16, background: '#F3F4F6', borderRadius: 8, marginBottom: 10, width: '60%' }} />
-                      <div style={{ height: 12, background: '#F3F4F6', borderRadius: 8, marginBottom: 6 }} />
-                      <div style={{ height: 12, background: '#F3F4F6', borderRadius: 8, width: '80%' }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )
-            : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 24 }}>
-                {listaCards.map(p => (
-                  <ProductCard key={p.id} produto={p} onEspiar={setEspiarProd} />
-                ))}
-              </div>
-            )
-          }
+          {/* Grid de cards — sempre visível, sem skeleton */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 24 }}>
+            {listaCards.map(p => (
+              <ProductCard key={p.id} produto={p} onEspiar={setEspiarProd} />
+            ))}
+          </div>
 
           <div style={{ textAlign: 'center', marginTop: 48 }}>
             <Link to="/produtos" className="site-btn-primary">Ver Catálogo Completo</Link>
