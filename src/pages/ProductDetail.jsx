@@ -27,10 +27,20 @@ function Galeria({ imagem_principal, imagens = [], emoji = '🛍️' }) {
   }
 
   return (
-    <div style={{ display: 'flex', gap: 12 }}>
-      {/* Miniaturas verticais */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* Imagem principal */}
+      <div style={{ borderRadius: 16, overflow: 'hidden', background: '#F9FAFB', aspectRatio: '1', maxHeight: 500, width: '100%' }}>
+        <img
+          key={ativa}
+          src={todas[ativa]}
+          alt="Produto"
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', animation: 'fadeImg .2s ease' }}
+        />
+      </div>
+
+      {/* Miniaturas horizontais abaixo */}
       {todas.length > 1 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: 72, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {todas.map((src, i) => (
             <button
               key={i}
@@ -38,8 +48,11 @@ function Galeria({ imagem_principal, imagens = [], emoji = '🛍️' }) {
               style={{
                 width: 72, height: 72, borderRadius: 10, overflow: 'hidden', padding: 0, cursor: 'pointer',
                 border: ativa === i ? '2.5px solid #D41B2C' : '2px solid #E5E7EB',
-                background: 'white', flexShrink: 0, transition: 'border-color .2s',
+                background: 'white', flexShrink: 0, transition: 'border-color .2s, transform .15s',
+                transform: ativa === i ? 'scale(1.05)' : 'scale(1)',
               }}
+              onMouseEnter={e => { if (ativa !== i) e.currentTarget.style.borderColor = '#FCA5A5' }}
+              onMouseLeave={e => { if (ativa !== i) e.currentTarget.style.borderColor = '#E5E7EB' }}
             >
               <img src={src} alt={`Foto ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </button>
@@ -47,14 +60,7 @@ function Galeria({ imagem_principal, imagens = [], emoji = '🛍️' }) {
         </div>
       )}
 
-      {/* Imagem principal */}
-      <div style={{ flex: 1, borderRadius: 16, overflow: 'hidden', background: '#F9FAFB', aspectRatio: '1', maxHeight: 500 }}>
-        <img
-          src={todas[ativa]}
-          alt="Produto"
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'opacity .25s' }}
-        />
-      </div>
+      <style>{`@keyframes fadeImg { from { opacity: 0.6 } to { opacity: 1 } }`}</style>
     </div>
   )
 }
