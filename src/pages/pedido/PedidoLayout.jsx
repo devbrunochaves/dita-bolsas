@@ -21,8 +21,9 @@ export default function PedidoLayout() {
       { to: '/pedido/meu-financeiro', label: 'Meu Financeiro', icon: '💵' },
     ] : []),
     ...(isAdmin ? [
-      { to: '/pedido/colaboradores', label: 'Colaboradores', icon: '🔑' },
-      { to: '/pedido/financeiro',    label: 'Financeiro',    icon: '💰' },
+      { to: '/pedido/colaboradores', label: 'Colaboradores',  icon: '🔑' },
+      { to: '/pedido/financeiro',    label: 'Financeiro',     icon: '💰' },
+      { to: '/pedido/site',          label: 'Gerenciar Site', icon: '🌐' },
     ] : []),
   ]
 

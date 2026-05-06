@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { getBanners } from '../utils/storage'
 
 // ---- Contador animado ----
 function Counter({ target, suffix = '', prefix = '' }) {
@@ -65,28 +66,99 @@ const HERO_SLIDES = [
   { id: 5, emoji: '🖼️', label: 'Porta-Retratos',         sub: 'Presentes e lembranças únicas',      bg: 'linear-gradient(145deg, #1a1208 0%, #6e4a1a 100%)' },
 ]
 
-function HeroCarousel() {
-  const [cur, setCur]     = useState(0)
-  const [prev, setPrev]   = useState(null)
-  const [fading, setFading] = useState(false)
+function HeroCarousel({ dbSlides }) {
+  // Usa banners do banco se disponíveis, caso contrário usa slides padrão
+  const slides = (dbSlides && dbSlides.length > 0) ? dbSlides : HERO_SLIDES
+  const isDb   = dbSlides && dbSlides.length > 0
+
+  const [cur, setCur]   = useState(0)
+  const [prev, setPrev] = useState(null)
+
+  // Reinicia índice se a fonte de slides mudar
+  useEffect(() => { setCur(0); setPrev(null) }, [isDb])
 
   useEffect(() => {
     const t = setInterval(() => {
       setPrev(cur)
-      setFading(true)
-      setCur(c => (c + 1) % HERO_SLIDES.length)
-      setTimeout(() => { setPrev(null); setFading(false) }, 600)
+      setCur(c => (c + 1) % slides.length)
+      setTimeout(() => setPrev(null), 600)
     }, 4000)
     return () => clearInterval(t)
-  }, [cur])
+  }, [cur, slides.length])
 
   function goTo(i) {
     if (i === cur) return
-    setPrev(cur); setFading(true); setCur(i)
-    setTimeout(() => { setPrev(null); setFading(false) }, 600)
+    setPrev(cur); setCur(i)
+    setTimeout(() => setPrev(null), 600)
   }
 
-  const slide = HERO_SLIDES[cur]
+  const slide = slides[cur]
+
+  function renderSlideInner(s, anim) {
+    if (isDb) {
+      // Banner do banco: mostra imagem de fundo
+      return (
+        <div key={s.id || anim} style={{
+          position: 'absolute', inset: 0, borderRadius: 20, overflow: 'hidden',
+          animation: anim,
+          boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+        }}>
+          <img
+            src={s.imagem_desk || s.imagem_mob}
+            alt={s.titulo || 'Banner'}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+          {/* Overlay escuro sutil no rodapé */}
+          {s.titulo && (
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0,
+              background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 100%)',
+              padding: '48px 24px 24px', borderRadius: '0 0 20px 20px',
+            }}>
+              <div style={{ fontSize: 'clamp(15px, 2vw, 19px)', fontWeight: 800, color: 'white', lineHeight: 1.3 }}>
+                {s.titulo}
+              </div>
+            </div>
+          )}
+        </div>
+      )
+    }
+    // Slides padrão (emoji + gradiente)
+    return (
+      <div key={s.id || anim} style={{
+        position: 'absolute', inset: 0, borderRadius: 20, overflow: 'hidden',
+        background: s.bg,
+        animation: anim,
+        boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+      }}>
+        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 30% 40%, rgba(212,27,44,0.25) 0%, transparent 65%)' }} />
+        <div style={{ position: 'absolute', inset: 0, borderRadius: 20, border: '1px solid rgba(255,255,255,0.08)' }} />
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 'clamp(72px, 10vw, 110px)',
+          filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.4))',
+        }}>
+          {s.emoji}
+        </div>
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%)',
+          padding: '48px 24px 24px', borderRadius: '0 0 20px 20px',
+        }}>
+          <div style={{ fontSize: 'clamp(15px, 2vw, 19px)', fontWeight: 800, color: 'white', lineHeight: 1.3 }}>{s.label}</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>{s.sub}</div>
+        </div>
+        <div style={{
+          position: 'absolute', top: 16, right: 16,
+          background: 'rgba(212,27,44,0.85)', backdropFilter: 'blur(8px)',
+          color: 'white', fontSize: 10, fontWeight: 800,
+          letterSpacing: 1.5, textTransform: 'uppercase',
+          padding: '4px 12px', borderRadius: 100,
+        }}>Dita Bolsas</div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ position: 'relative', width: '100%', aspectRatio: '4/3', maxHeight: 420 }}>
@@ -96,61 +168,24 @@ function HeroCarousel() {
       `}</style>
 
       {/* Slide atual */}
-      <div key={cur} style={{
-        position: 'absolute', inset: 0, borderRadius: 20, overflow: 'hidden',
-        background: slide.bg,
-        animation: 'heroFadeIn 0.6s ease forwards',
-        boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
-      }}>
-        {/* Glow */}
-        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 30% 40%, rgba(212,27,44,0.25) 0%, transparent 65%)' }} />
-        {/* Borda sutil */}
-        <div style={{ position: 'absolute', inset: 0, borderRadius: 20, border: '1px solid rgba(255,255,255,0.08)' }} />
-
-        {/* Emoji central */}
-        <div style={{
-          position: 'absolute', inset: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 'clamp(72px, 10vw, 110px)',
-          filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.4))',
-        }}>
-          {slide.emoji}
-        </div>
-
-        {/* Label inferior */}
-        <div style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0,
-          background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%)',
-          padding: '48px 24px 24px', borderRadius: '0 0 20px 20px',
-        }}>
-          <div style={{ fontSize: 'clamp(15px, 2vw, 19px)', fontWeight: 800, color: 'white', lineHeight: 1.3 }}>
-            {slide.label}
-          </div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>
-            {slide.sub}
-          </div>
-        </div>
-
-        {/* Badge */}
-        <div style={{
-          position: 'absolute', top: 16, right: 16,
-          background: 'rgba(212,27,44,0.85)', backdropFilter: 'blur(8px)',
-          color: 'white', fontSize: 10, fontWeight: 800,
-          letterSpacing: 1.5, textTransform: 'uppercase',
-          padding: '4px 12px', borderRadius: 100,
-        }}>
-          Dita Bolsas
-        </div>
-      </div>
+      {renderSlideInner(slide, 'heroFadeIn 0.6s ease forwards')}
 
       {/* Slide anterior a sair */}
       {prev !== null && (
-        <div key={`prev-${prev}`} style={{
+        <div style={{
           position: 'absolute', inset: 0, borderRadius: 20, overflow: 'hidden',
-          background: HERO_SLIDES[prev].bg,
+          ...(isDb ? {} : { background: slides[prev].bg }),
           animation: 'heroFadeOut 0.5s ease forwards',
           zIndex: -1,
-        }} />
+        }}>
+          {isDb && slides[prev] && (
+            <img
+              src={slides[prev].imagem_desk || slides[prev].imagem_mob}
+              alt=""
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
+          )}
+        </div>
       )}
 
       {/* Dots */}
@@ -158,7 +193,7 @@ function HeroCarousel() {
         position: 'absolute', bottom: -28, left: 0, right: 0,
         display: 'flex', justifyContent: 'center', gap: 6,
       }}>
-        {HERO_SLIDES.map((_, i) => (
+        {slides.map((_, i) => (
           <button key={i} onClick={() => goTo(i)} style={{
             width: i === cur ? 24 : 7, height: 7, borderRadius: 4, padding: 0, border: 'none',
             background: i === cur ? '#D41B2C' : 'rgba(255,255,255,0.3)',
@@ -388,6 +423,14 @@ function Carousel() {
 }
 
 export default function Home() {
+  const [dbBanners, setDbBanners] = useState([])
+
+  useEffect(() => {
+    getBanners(true)
+      .then(rows => { if (rows && rows.length) setDbBanners(rows) })
+      .catch(() => {}) // silencioso — fallback para slides padrão
+  }, [])
+
   return (
     <main style={{ paddingTop: 68 }}>
 
@@ -440,7 +483,7 @@ export default function Home() {
 
             {/* ── Coluna direita: carrossel ── */}
             <div className="hero-carousel-wrap" style={{ paddingBottom: 36 }}>
-              <HeroCarousel />
+              <HeroCarousel dbSlides={dbBanners} />
             </div>
 
           </div>

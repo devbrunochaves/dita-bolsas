@@ -22,6 +22,7 @@ import Colaboradores from './pages/pedido/Colaboradores'
 import Financeiro from './pages/pedido/Financeiro'
 import MeuFinanceiro from './pages/pedido/MeuFinanceiro'
 import Producao from './pages/pedido/Producao'
+import GerenciarSite from './pages/pedido/GerenciarSite'
 
 export default function App() {
   return (
@@ -63,6 +64,11 @@ export default function App() {
           <Route path="financeiro" element={
             <ProtectedRoute adminOnly>
               <Financeiro />
+            </ProtectedRoute>
+          } />
+          <Route path="site" element={
+            <ProtectedRoute adminOnly>
+              <GerenciarSite />
             </ProtectedRoute>
           } />
         </Route>

@@ -621,6 +621,156 @@ export async function updateStatusProducao(id, novoStatus, pedidoAtual = null) {
 }
 
 // ============================================================
+//  SITE — Banners, Catálogo, Configurações
+// ============================================================
+
+const BUCKET = 'site-imagens'
+
+/** Faz upload de um File para o Storage e retorna a URL pública */
+export async function uploadImagem(pasta, arquivo) {
+  const ext  = arquivo.name.split('.').pop()
+  const nome = `${pasta}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+
+  const { error: upErr } = await supabase.storage
+    .from(BUCKET)
+    .upload(nome, arquivo, { cacheControl: '3600', upsert: false })
+  if (upErr) throw new Error(upErr.message)
+
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(nome)
+  return data.publicUrl
+}
+
+/** Remove um arquivo do Storage pela URL pública */
+export async function deleteImagem(url) {
+  if (!url) return
+  try {
+    // Extrai o path relativo dentro do bucket
+    const path = url.split(`/${BUCKET}/`)[1]
+    if (path) await supabase.storage.from(BUCKET).remove([path])
+  } catch { /* silencia — arquivo pode já ter sido removido */ }
+}
+
+// ── BANNERS ──────────────────────────────────────────────────
+
+export async function getBanners(somenteAtivos = false) {
+  let q = supabase.from('banners').select('*').order('ordem')
+  if (somenteAtivos) q = q.eq('ativo', true)
+  const { data, error } = await q
+  check(error, 'getBanners')
+  return data || []
+}
+
+export async function saveBanner(banner) {
+  const row = {
+    titulo:      banner.titulo      || null,
+    imagem_desk: banner.imagem_desk || null,
+    imagem_mob:  banner.imagem_mob  || null,
+    link:        banner.link        || null,
+    ordem:       banner.ordem       ?? 0,
+    ativo:       banner.ativo       ?? true,
+  }
+
+  if (banner.id) {
+    const { data, error } = await withTimeout(
+      supabase.from('banners').update(row).eq('id', banner.id).select().single()
+    )
+    check(error, 'saveBanner/update')
+    return data
+  } else {
+    const { data, error } = await withTimeout(
+      supabase.from('banners').insert(row).select().single()
+    )
+    check(error, 'saveBanner/insert')
+    return data
+  }
+}
+
+export async function deleteBanner(id) {
+  const { error } = await supabase.from('banners').delete().eq('id', id)
+  check(error, 'deleteBanner')
+}
+
+export async function toggleBanner(id, ativo) {
+  const { error } = await supabase.from('banners').update({ ativo }).eq('id', id)
+  check(error, 'toggleBanner')
+}
+
+export async function reordenarBanners(ids) {
+  // ids = array ordenado de UUIDs; atualiza o campo `ordem` de cada um
+  const updates = ids.map((id, i) =>
+    supabase.from('banners').update({ ordem: i }).eq('id', id)
+  )
+  await Promise.all(updates)
+}
+
+// ── PRODUTOS DO SITE ─────────────────────────────────────────
+
+export async function getSiteProdutos({ somenteAtivos = false, categoria } = {}) {
+  let q = supabase.from('site_produtos').select('*').order('ordem')
+  if (somenteAtivos) q = q.eq('ativo', true)
+  if (categoria)     q = q.eq('categoria', categoria)
+  const { data, error } = await q
+  check(error, 'getSiteProdutos')
+  return data || []
+}
+
+export async function getSiteProdutoById(id) {
+  const { data, error } = await supabase
+    .from('site_produtos').select('*').eq('id', id).single()
+  check(error, 'getSiteProdutoById')
+  return data
+}
+
+export async function saveSiteProduto(produto) {
+  const row = {
+    nome:             produto.nome,
+    categoria:        produto.categoria        || 'Geral',
+    descricao:        produto.descricao        || null,
+    imagem_principal: produto.imagem_principal || null,
+    imagens:          produto.imagens          || [],
+    faixas_preco:     produto.faixas_preco     || [],
+    caracteristicas:  produto.caracteristicas  || [],
+    ativo:            produto.ativo            ?? true,
+    destaque:         produto.destaque         ?? false,
+    ordem:            produto.ordem            ?? 0,
+  }
+
+  if (produto.id) {
+    const { data, error } = await withTimeout(
+      supabase.from('site_produtos').update(row).eq('id', produto.id).select().single()
+    )
+    check(error, 'saveSiteProduto/update')
+    return data
+  } else {
+    const { data, error } = await withTimeout(
+      supabase.from('site_produtos').insert(row).select().single()
+    )
+    check(error, 'saveSiteProduto/insert')
+    return data
+  }
+}
+
+export async function deleteSiteProduto(id) {
+  const { error } = await supabase.from('site_produtos').delete().eq('id', id)
+  check(error, 'deleteSiteProduto')
+}
+
+// ── CONFIGURAÇÕES DO SITE ────────────────────────────────────
+
+export async function getSiteConfig() {
+  const { data, error } = await supabase.from('site_config').select('*')
+  check(error, 'getSiteConfig')
+  return Object.fromEntries((data || []).map(r => [r.chave, r.valor]))
+}
+
+export async function setSiteConfig(chave, valor) {
+  const { error } = await supabase
+    .from('site_config')
+    .upsert({ chave, valor }, { onConflict: 'chave' })
+  check(error, 'setSiteConfig')
+}
+
+// ============================================================
 //  SEED — só popula se banco estiver vazio
 // ============================================================
 
