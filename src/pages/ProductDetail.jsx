@@ -117,8 +117,15 @@ export default function ProductDetail() {
     setLoading(true)
     setNotFound(false)
 
+    // Timeout de 10s: se o banco não responder, mostra "não encontrado"
+    const timeout = setTimeout(() => {
+      setNotFound(true)
+      setLoading(false)
+    }, 10000)
+
     getSiteProdutos({ somenteAtivos: true })
       .then(rows => {
+        clearTimeout(timeout)
         const p = rows?.find(r => slugify(r.nome) === slug)
         if (!p) { setNotFound(true); setLoading(false); return }
 
@@ -132,7 +139,9 @@ export default function ProductDetail() {
         setRelacionados([...mesmaCat, ...outros].slice(0, 4))
         setLoading(false)
       })
-      .catch(() => { setNotFound(true); setLoading(false) })
+      .catch(() => { clearTimeout(timeout); setNotFound(true); setLoading(false) })
+
+    return () => clearTimeout(timeout)
   }, [slug])
 
   // Loading

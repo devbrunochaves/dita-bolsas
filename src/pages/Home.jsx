@@ -177,7 +177,14 @@ function ProductCard({ produto, onEspiar }) {
 
   return (
     <div
-      onClick={() => navigate(`/produto/${slugify(produto.nome)}`)}
+      onClick={() => {
+        // Fallback (id começa com 'f'): vai para o catálogo filtrado por categoria
+        if (String(produto.id).startsWith('f')) {
+          navigate(`/produtos${produto.categoria ? '?categoria=' + encodeURIComponent(produto.categoria) : ''}`)
+        } else {
+          navigate(`/produto/${slugify(produto.nome)}`)
+        }
+      }}
       style={{
         background: 'white', borderRadius: 16, overflow: 'hidden',
         boxShadow: '0 4px 20px rgba(0,0,0,0.07)',
@@ -227,7 +234,14 @@ function ProductCard({ produto, onEspiar }) {
             }
           </div>
           <button
-            onClick={() => navigate(`/produto/${slugify(produto.nome)}`)}
+            onClick={e => {
+              e.stopPropagation()
+              if (String(produto.id).startsWith('f')) {
+                navigate(`/produtos${produto.categoria ? '?categoria=' + encodeURIComponent(produto.categoria) : ''}`)
+              } else {
+                navigate(`/produto/${slugify(produto.nome)}`)
+              }
+            }}
             style={{
               background: '#1F2937', color: 'white',
               border: 'none', borderRadius: 10,
