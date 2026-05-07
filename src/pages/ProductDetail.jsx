@@ -113,6 +113,8 @@ export default function ProductDetail() {
   const [faixaSel,      setFaixaSel]      = useState(null)
   const [notFound,      setNotFound]      = useState(false)
 
+  useEffect(() => { window.scrollTo(0, 0) }, [slug])
+
   useEffect(() => {
     setLoading(true)
     setNotFound(false)
