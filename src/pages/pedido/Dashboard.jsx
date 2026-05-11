@@ -86,6 +86,14 @@ export default function Dashboard() {
     setPedidos(prev => prev.map(p => p.id === id ? { ...p, status: novoStatus } : p))
   }, [])
 
+  // Contagens por status — DEVE ficar antes de qualquer return condicional (Rules of Hooks)
+  const contagemStatus = useMemo(() =>
+    STATUS_LIST.reduce((acc, s) => {
+      acc[s] = pedidos.filter(p => (p.status || 'PENDENTE') === s).length
+      return acc
+    }, {}),
+  [pedidos])
+
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, flexDirection: 'column', gap: 16 }}>
       <div style={{ width: 40, height: 40, border: '4px solid #E5E7EB', borderTopColor: '#1B6E3C', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
@@ -99,14 +107,6 @@ export default function Dashboard() {
       ⚠️ Erro ao conectar com o banco de dados: <strong>{error}</strong>
     </div>
   )
-
-  // Contagens por status — memoizado para não recalcular a cada render
-  const contagemStatus = useMemo(() =>
-    STATUS_LIST.reduce((acc, s) => {
-      acc[s] = pedidos.filter(p => (p.status || 'PENDENTE') === s).length
-      return acc
-    }, {}),
-  [pedidos])
 
   return (
     <div>
