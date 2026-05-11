@@ -247,7 +247,7 @@ const KanbanCard = memo(function KanbanCard({ pedido, coluna, isAdmin, dragging,
       )}
     </div>
   )
-}
+})
 
 // ── Coluna do kanban ─────────────────────────────────────────
 function KanbanColuna({ coluna, pedidos, isAdmin, dragging, dragOver, onDragStart, onDragEnd, onDragOver, onDragLeave, onDrop }) {
