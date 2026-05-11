@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { getClientes, getProdutos, getPedidos } from '../../utils/storage'
+import { getCountClientes, getCountProdutos, getPedidos } from '../../utils/storage'
 import { StatusSelect, STATUS_CONFIG, STATUS_LIST } from '../../components/StatusSelect'
 
 // ── Card de estatística ──────────────────────────────────────
@@ -54,18 +54,23 @@ function StatusCard({ status, count }) {
 
 // ── Componente principal ─────────────────────────────────────
 export default function Dashboard() {
-  const [clientes, setClientes] = useState([])
-  const [produtos, setProdutos] = useState([])
-  const [pedidos, setPedidos]   = useState([])
-  const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState(null)
+  const [countClientes, setCountClientes] = useState(0)
+  const [countProdutos, setCountProdutos] = useState(0)
+  const [pedidos, setPedidos]             = useState([])
+  const [loading, setLoading]             = useState(true)
+  const [error, setError]                 = useState(null)
 
   useEffect(() => {
     async function load() {
       try {
-        const [c, p, ped] = await Promise.all([getClientes(), getProdutos(), getPedidos()])
-        setClientes(c)
-        setProdutos(p)
+        // Counts via HEAD query (sem transferir dados) + pedidos recentes limitados
+        const [cc, cp, ped] = await Promise.all([
+          getCountClientes(),
+          getCountProdutos(),
+          getPedidos({ limite: 50, diasAtras: 90 }),
+        ])
+        setCountClientes(cc)
+        setCountProdutos(cp)
         setPedidos(ped)
       } catch (err) {
         setError(err.message)
@@ -95,11 +100,13 @@ export default function Dashboard() {
     </div>
   )
 
-  // Contagens por status
-  const contagemStatus = STATUS_LIST.reduce((acc, s) => {
-    acc[s] = pedidos.filter(p => (p.status || 'PENDENTE') === s).length
-    return acc
-  }, {})
+  // Contagens por status — memoizado para não recalcular a cada render
+  const contagemStatus = useMemo(() =>
+    STATUS_LIST.reduce((acc, s) => {
+      acc[s] = pedidos.filter(p => (p.status || 'PENDENTE') === s).length
+      return acc
+    }, {}),
+  [pedidos])
 
   return (
     <div>
@@ -115,9 +122,9 @@ export default function Dashboard() {
 
       {/* Cards de totais gerais */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 16, marginBottom: 28 }}>
-        <StatCard icon="👥" label="Clientes cadastrados" value={clientes.length} color="#1B6E3C" to="/pedido/clientes" />
-        <StatCard icon="📦" label="Produtos cadastrados" value={produtos.length} color="#2563EB" to="/pedido/produtos" />
-        <StatCard icon="📋" label="Pedidos emitidos"     value={pedidos.length}  color="#D97706" to="/pedido" />
+        <StatCard icon="👥" label="Clientes cadastrados" value={countClientes} color="#1B6E3C" to="/pedido/clientes" />
+        <StatCard icon="📦" label="Produtos cadastrados" value={countProdutos} color="#2563EB" to="/pedido/produtos" />
+        <StatCard icon="📋" label="Pedidos emitidos"     value={pedidos.length} color="#D97706" to="/pedido" />
       </div>
 
       {/* Cards de status dos pedidos */}

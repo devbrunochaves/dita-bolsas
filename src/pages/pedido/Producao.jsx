@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
 import { getPedidosProducao, updateStatusProducao } from '../../utils/storage'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -68,9 +68,19 @@ function fmtBRL(v) {
 }
 
 // ── Card do pedido ───────────────────────────────────────────
-function KanbanCard({ pedido, coluna, isAdmin, dragging, onDragStart, onDragEnd, tick }) {
+// memo() evita re-render quando props não mudaram
+// tick foi removido como prop externa — card EM_PRODUCAO mantém seu próprio timer
+const KanbanCard = memo(function KanbanCard({ pedido, coluna, isAdmin, dragging, onDragStart, onDragEnd }) {
   const cardRef   = useRef(null)
   const isDragged = dragging === pedido.id
+
+  // Timer interno: só cards EM_PRODUCAO precisam atualizar o tempo a cada minuto
+  const [, setLocalTick] = useState(0)
+  useEffect(() => {
+    if (coluna.key !== 'EM_PRODUCAO') return
+    const t = setInterval(() => setLocalTick(n => n + 1), 60000)
+    return () => clearInterval(t)
+  }, [coluna.key])
 
   const itensTruncados = pedido.itens?.slice(0, 3) || []
   const maisItens      = (pedido.itens?.length || 0) - 3
@@ -240,7 +250,7 @@ function KanbanCard({ pedido, coluna, isAdmin, dragging, onDragStart, onDragEnd,
 }
 
 // ── Coluna do kanban ─────────────────────────────────────────
-function KanbanColuna({ coluna, pedidos, isAdmin, dragging, dragOver, onDragStart, onDragEnd, onDragOver, onDragLeave, onDrop, tick }) {
+function KanbanColuna({ coluna, pedidos, isAdmin, dragging, dragOver, onDragStart, onDragEnd, onDragOver, onDragLeave, onDrop }) {
   const isOver = dragOver === coluna.key
 
   return (
@@ -329,7 +339,6 @@ function KanbanColuna({ coluna, pedidos, isAdmin, dragging, dragOver, onDragStar
               dragging={dragging}
               onDragStart={onDragStart}
               onDragEnd={onDragEnd}
-              tick={tick}
             />
           ))
         )}
@@ -360,13 +369,7 @@ export default function Producao() {
   const [dragOver, setDragOver]   = useState(null)     // key da coluna sendo hovada
   const [movendo, setMovendo]     = useState(new Set()) // ids sendo salvos
   const [busca, setBusca]         = useState('')
-  const [tick, setTick]           = useState(0)        // ticker para atualizar timers
-
-  // Atualiza timers a cada minuto
-  useEffect(() => {
-    const t = setInterval(() => setTick(n => n + 1), 60000)
-    return () => clearInterval(t)
-  }, [])
+  // tick removido: cada KanbanCard EM_PRODUCAO tem seu próprio timer interno
 
   const carregar = useCallback(async () => {
     setLoading(true)
@@ -376,23 +379,29 @@ export default function Producao() {
 
   useEffect(() => { carregar() }, [carregar])
 
-  // Filtra por busca
-  const pedidosFiltrados = pedidos.filter(p => {
-    if (!busca.trim()) return true
+  // Filtra por busca — memoizado para não recalcular a cada render
+  const pedidosFiltrados = useMemo(() => {
+    if (!busca.trim()) return pedidos
     const q = busca.toLowerCase()
-    return (
+    return pedidos.filter(p =>
       String(p.numero).includes(q) ||
       p.cliente?.nome?.toLowerCase().includes(q) ||
       p.emitidoPor?.toLowerCase().includes(q) ||
       p.itens?.some(i => i.nome?.toLowerCase().includes(q))
     )
-  })
+  }, [pedidos, busca])
 
-  // Agrupa por status de produção
-  const porColuna = {}
-  COLUNAS.forEach(c => {
-    porColuna[c.key] = pedidosFiltrados.filter(p => (p.statusProducao || 'PENDENTE') === c.key)
-  })
+  // Agrupa por status de produção e calcula totais — memoizado
+  const { porColuna, totalPedidos, totalValor } = useMemo(() => {
+    const cols = {}
+    COLUNAS.forEach(c => {
+      cols[c.key] = pedidosFiltrados.filter(p => (p.statusProducao || 'PENDENTE') === c.key)
+    })
+    const tv = pedidosFiltrados
+      .filter(p => p.statusProducao !== 'ENTREGUE')
+      .reduce((s, p) => s + (p.valorFinal || 0), 0)
+    return { porColuna: cols, totalPedidos: pedidosFiltrados.length, totalValor: tv }
+  }, [pedidosFiltrados])
 
   // ── Drag & Drop ──────────────────────────────────────────────
   const handleDragStart = useCallback((id) => setDragging(id), [])
@@ -442,12 +451,6 @@ export default function Producao() {
       setMovendo(prev => { const s = new Set(prev); s.delete(pedidoId); return s })
     }
   }, [pedidos])
-
-  // ── Totais ───────────────────────────────────────────────────
-  const totalPedidos = pedidosFiltrados.length
-  const totalValor   = pedidosFiltrados
-    .filter(p => p.statusProducao !== 'ENTREGUE')
-    .reduce((s, p) => s + p.valorFinal, 0)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 16 }}>
@@ -556,7 +559,6 @@ export default function Producao() {
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                tick={tick}
               />
             ))}
           </div>

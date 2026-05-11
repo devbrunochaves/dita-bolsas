@@ -66,6 +66,37 @@ async function getUserAndProfile() {
 }
 
 // ============================================================
+//  COUNTS — queries leves para cards de estatística
+// ============================================================
+
+export async function getCountClientes() {
+  const { user, profile } = await getUserAndProfile()
+  const isAdmin = profile?.tipo === 'admin'
+  let query = supabase.from('clientes').select('*', { count: 'exact', head: true })
+  if (!isAdmin && user) query = query.eq('user_id', user.id)
+  const { count, error } = await query
+  check(error, 'getCountClientes')
+  return count || 0
+}
+
+export async function getCountProdutos() {
+  const { count, error } = await supabase
+    .from('produtos').select('*', { count: 'exact', head: true })
+  check(error, 'getCountProdutos')
+  return count || 0
+}
+
+export async function getCountPedidos() {
+  const { user, profile } = await getUserAndProfile()
+  const isAdmin = profile?.tipo === 'admin'
+  let query = supabase.from('pedidos').select('*', { count: 'exact', head: true })
+  if (!isAdmin && user) query = query.eq('user_id', user.id)
+  const { count, error } = await query
+  check(error, 'getCountPedidos')
+  return count || 0
+}
+
+// ============================================================
 //  CLIENTES
 // ============================================================
 
@@ -245,11 +276,22 @@ function mapProduto(r) {
 //  PEDIDOS
 // ============================================================
 
-export async function getPedidos() {
-  const { data, error } = await supabase
+// limite: máx de registros a retornar (default 200)
+// diasAtras: se fornecido, filtra só os últimos N dias
+export async function getPedidos({ limite = 200, diasAtras = null } = {}) {
+  let query = supabase
     .from('pedidos')
     .select('*')
     .order('created_at', { ascending: false })
+    .limit(limite)
+
+  if (diasAtras) {
+    const corte = new Date()
+    corte.setDate(corte.getDate() - diasAtras)
+    query = query.gte('created_at', corte.toISOString())
+  }
+
+  const { data, error } = await query
   check(error, 'getPedidos')
   return (data || []).map(mapPedido)
 }
@@ -262,10 +304,14 @@ export async function savePedido(pedido) {
   const valorFinal        = Number(pedido.valorFinal || 0)
   const valorComissao     = parseFloat(((valorFinal * comissaoPercent) / 100).toFixed(2))
 
-  // Busca próximo número
-  const { count } = await supabase
+  // Busca próximo número via MAX — muito mais rápido que COUNT(*) em tabelas grandes
+  const { data: maxRow } = await supabase
     .from('pedidos')
-    .select('*', { count: 'exact', head: true })
+    .select('numero')
+    .order('numero', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const count = maxRow?.numero ?? 0   // reutiliza nome para manter a linha abaixo sem alterar
 
   // Data do pedido — pode ser retroativa (enviada pelo formulário) ou agora
   const dataPedido = pedido.data
@@ -557,52 +603,51 @@ export async function deleteColaborador(id) {
 //  PRODUÇÃO — Kanban
 // ============================================================
 
-/** Busca todos os pedidos para o kanban de produção */
+/** Busca pedidos para o kanban de produção.
+ *  - Todos os não-ENTREGUE sem limite de data (garantia de não perder pendentes)
+ *  - ENTREGUE apenas dos últimos 7 dias (limpeza automática do kanban)
+ *  Feito em 2 queries paralelas para evitar OR complexo no Supabase. */
 export async function getPedidosProducao() {
-  const { data, error } = await supabase
-    .from('pedidos')
-    .select('*')
-    .not('status', 'eq', 'CANCELADO')
-    .order('created_at', { ascending: false })
-  check(error, 'getPedidosProducao')
-  return (data || []).map(mapPedido)
+  const seteDiasAtras = new Date()
+  seteDiasAtras.setDate(seteDiasAtras.getDate() - 7)
+
+  const [resAtivos, resEntregues] = await Promise.all([
+    // Todos os pedidos que ainda não foram entregues
+    supabase
+      .from('pedidos')
+      .select('*')
+      .not('status', 'eq', 'CANCELADO')
+      .neq('status_producao', 'ENTREGUE')
+      .order('created_at', { ascending: false }),
+
+    // Entregues apenas dos últimos 7 dias (para fechar o kanban sem sumir imediatamente)
+    supabase
+      .from('pedidos')
+      .select('*')
+      .eq('status_producao', 'ENTREGUE')
+      .gte('created_at', seteDiasAtras.toISOString())
+      .order('created_at', { ascending: false }),
+  ])
+
+  check(resAtivos.error,    'getPedidosProducao/ativos')
+  check(resEntregues.error, 'getPedidosProducao/entregues')
+
+  const todos = [...(resAtivos.data || []), ...(resEntregues.data || [])]
+  todos.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  return todos.map(mapPedido)
 }
 
 /**
  * Move um pedido para um novo status de produção.
- * Registra timestamps automaticamente.
+ * Os timestamps (producao_iniciada_at, producao_finalizada_at) são gerenciados
+ * exclusivamente pelo trigger `trg_producao_timestamps` no banco de dados.
+ * O frontend envia apenas o novo status — o banco define os horários com NOW().
  */
 export async function updateStatusProducao(id, novoStatus, pedidoAtual = null) {
-  const agora = new Date().toISOString()
   const updates = { status_producao: novoStatus }
 
-  if (novoStatus === 'PENDENTE') {
-    // Volta ao início — limpa timestamps
-    updates.producao_iniciada_at   = null
-    updates.producao_finalizada_at = null
-  } else if (novoStatus === 'EM_PRODUCAO') {
-    // Registra início apenas se ainda não foi marcado
-    if (!pedidoAtual?.producaoIniciadaAt) {
-      updates.producao_iniciada_at = agora
-    }
-    // Se estava em FINALIZADO e voltou, limpa finalização
-    updates.producao_finalizada_at = null
-  } else if (novoStatus === 'FINALIZADO') {
-    // Garante que tem início registrado
-    if (!pedidoAtual?.producaoIniciadaAt) {
-      updates.producao_iniciada_at = agora
-    }
-    updates.producao_finalizada_at = agora
-  } else if (novoStatus === 'ENTREGUE') {
-    // Se não passou por FINALIZADO, registra finalização agora
-    if (!pedidoAtual?.producaoFinalizadaAt) {
-      updates.producao_finalizada_at = agora
-    }
-    // Garante início registrado
-    if (!pedidoAtual?.producaoIniciadaAt) {
-      updates.producao_iniciada_at = agora
-    }
-    // Sincroniza status operacional
+  // Sincroniza status operacional ao entregar
+  if (novoStatus === 'ENTREGUE') {
     updates.status = 'ENTREGUE'
   }
 
@@ -696,11 +741,11 @@ export async function toggleBanner(id, ativo) {
 }
 
 export async function reordenarBanners(ids) {
-  // ids = array ordenado de UUIDs; atualiza o campo `ordem` de cada um
-  const updates = ids.map((id, i) =>
-    supabase.from('banners').update({ ordem: i }).eq('id', id)
-  )
-  await Promise.all(updates)
+  // Uma única chamada upsert em vez de N requests paralelas
+  const { error } = await supabase
+    .from('banners')
+    .upsert(ids.map((id, i) => ({ id, ordem: i })), { onConflict: 'id' })
+  if (error) throw new Error(error.message)
 }
 
 // ── PRODUTOS DO SITE ─────────────────────────────────────────

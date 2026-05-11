@@ -43,10 +43,12 @@ function periodoRange(tipo) {
   return { inicio: null, fim: null }
 }
 
-/** Resolve se um pedido está atrasado (pendente + vencimento expirado) */
-function resolveStatus(p) {
+/** Resolve se um pedido está atrasado (pendente + vencimento expirado).
+ *  hojeStr é opcional — passe-o quando mapear muitos pedidos para evitar
+ *  chamar hoje() N vezes (ex.: no useMemo de pedidosComStatus). */
+function resolveStatus(p, hojeStr = hoje()) {
   if (p.statusFinanceiro !== 'pendente') return p.statusFinanceiro
-  if (p.dataVencimento && p.dataVencimento < hoje()) return 'atrasado'
+  if (p.dataVencimento && p.dataVencimento < hojeStr) return 'atrasado'
   return 'pendente'
 }
 
@@ -836,6 +838,8 @@ export default function Financeiro() {
     return nomes.sort()
   }, [pedidos])
 
+  // filtroCliente foi removido das deps: filtrar nome client-side evita
+  // um request ao banco a cada keystroke (veja pedidosFiltrados abaixo).
   const carregar = useCallback(async () => {
     setLoading(true)
     try {
@@ -846,29 +850,35 @@ export default function Financeiro() {
       const data = await getFinanceiro({
         inicio: range.inicio,
         fim:    range.fim,
-        vendedor:       filtroVendedor !== 'todos' ? filtroVendedor : null,
-        clienteNome:    filtroCliente  || null,
-        statusFinanceiro: filtroStatus !== 'todos' ? filtroStatus : null,
+        vendedor:         filtroVendedor !== 'todos' ? filtroVendedor : null,
+        statusFinanceiro: filtroStatus   !== 'todos' ? filtroStatus   : null,
       })
       setPedidos(data)
     } finally {
       setLoading(false)
     }
-  }, [periodo, customInicio, customFim, filtroVendedor, filtroCliente, filtroStatus])
+  }, [periodo, customInicio, customFim, filtroVendedor, filtroStatus])
 
   useEffect(() => { carregar() }, [carregar])
 
   // ── Pedidos com status resolvido ─────────────────────────────
-  const pedidosComStatus = useMemo(() =>
-    pedidos.map(p => ({ ...p, _statusResolvido: resolveStatus(p) })),
-  [pedidos])
+  // hoje() é calculado UMA vez fora do .map() para não criar N Date objects
+  const pedidosComStatus = useMemo(() => {
+    const hojeStr = hoje()
+    return pedidos.map(p => ({ ...p, _statusResolvido: resolveStatus(p, hojeStr) }))
+  }, [pedidos])
 
-  // Filtragem extra para "atrasado" (computado client-side, não vem do DB)
+  // Filtragem client-side: "atrasado" (calculado, não vem do DB) + nome do cliente
   const pedidosFiltrados = useMemo(() => {
+    let lista = pedidosComStatus
     if (filtroStatus === 'atrasado')
-      return pedidosComStatus.filter(p => p._statusResolvido === 'atrasado')
-    return pedidosComStatus
-  }, [pedidosComStatus, filtroStatus])
+      lista = lista.filter(p => p._statusResolvido === 'atrasado')
+    if (filtroCliente.trim()) {
+      const q = filtroCliente.toLowerCase()
+      lista = lista.filter(p => p.cliente?.nome?.toLowerCase().includes(q))
+    }
+    return lista
+  }, [pedidosComStatus, filtroStatus, filtroCliente])
 
   // ── Cálculos dos cards ────────────────────────────────────────
   const cards = useMemo(() => {

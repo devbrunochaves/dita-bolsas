@@ -48,15 +48,20 @@ export function AuthProvider({ children }) {
         }
 
         // ── INITIAL_SESSION: restauração ao reabrir a aba ─────────────
-        // O JWT já está no localStorage — a sessão é válida sem ir ao banco.
-        // Liberamos a UI imediatamente e buscamos o profile em background.
+        // Aguarda o profile ANTES de liberar a UI. Isso garante que o
+        // ProtectedRoute pode checar profile.ativo e bloquear contas
+        // desativadas sem nenhuma janela de acesso indevido.
+        // Timeout de 5s para não travar em cold start do Supabase Free.
         if (event === 'INITIAL_SESSION') {
           clearTimeout(safetyTimeout)
-          if (mounted) { setUser(u); setLoading(false) }
-          // Profile em background — não bloqueia a navegação
-          fetchProfile(u.id).then(p => {
-            if (mounted) setProfile(p)
-          })
+          const p = await Promise.race([
+            fetchProfile(u.id),
+            new Promise(resolve => setTimeout(() => resolve(null), 5000)),
+          ])
+          if (!mounted) return
+          setUser(u)
+          setProfile(p)
+          setLoading(false)
           return
         }
 

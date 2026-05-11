@@ -26,11 +26,16 @@ export default function ProtectedRoute({ children, adminOnly = false }) {
   // Não logado → login
   if (!user) return <Navigate to="/login" replace />
 
-  // Conta explicitamente desativada → login
-  // (null = perfil ainda carregando ou erro de busca — não bloquear)
+  // Conta desativada → login
+  // Após a correção do AuthContext, o profile já chegou antes do loading=false.
+  // Se ainda for null (timeout de 5s esgotou), deixa passar — mas loga aviso.
+  if (profile === null) {
+    console.warn('[Auth] Profile não carregou a tempo — acesso liberado sem verificação de ativo')
+  }
   if (profile?.ativo === false) return <Navigate to="/login" replace />
 
-  // Rota exclusiva de admin → acesso negado
+  // Rota exclusiva de admin:
+  // Se profile ainda é null (timeout), bloqueia rotas adminOnly por segurança.
   if (adminOnly && profile?.tipo !== 'admin') {
     return <Navigate to="/pedido" replace />
   }

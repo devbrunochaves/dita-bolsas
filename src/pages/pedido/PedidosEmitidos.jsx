@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { getPedidos, deletePedido, getPedidoHistorico } from '../../utils/storage'
 import { useAuth } from '../../contexts/AuthContext'
 import { StatusSelect, StatusBadge, STATUS_CONFIG, STATUS_LIST } from '../../components/StatusSelect'
@@ -403,6 +403,9 @@ function PedidoModal({ pedido, isAdmin, onClose, onStatusChange, onDelete }) {
   )
 }
 
+// Função pura sem dependências — fora do componente para estabilidade de referência
+const fmtBRL = v => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+
 // ── Página principal ─────────────────────────────────────────
 export default function PedidosEmitidos() {
   const [pedidos, setPedidos]           = useState([])
@@ -434,23 +437,28 @@ export default function PedidosEmitidos() {
     setPedidos(prev => prev.filter(p => p.id !== id))
   }
 
-  // Contagens para os botões de filtro
-  const contagem = STATUS_LIST.reduce((acc, s) => {
-    acc[s] = pedidos.filter(p => (p.status || 'PENDENTE') === s).length
-    return acc
-  }, {})
+  // Contagens memoizadas — só recalcula quando `pedidos` muda
+  const contagem = useMemo(() =>
+    STATUS_LIST.reduce((acc, s) => {
+      acc[s] = pedidos.filter(p => (p.status || 'PENDENTE') === s).length
+      return acc
+    }, {}),
+  [pedidos])
 
-  // Pedidos filtrados
-  const filtrados = pedidos.filter(p => {
-    const statusAtual = p.status || 'PENDENTE'
-    const passaStatus = filtroStatus === 'TODOS' || statusAtual === filtroStatus
-    const passaBusca  = !busca ||
-      p.cliente?.nome?.toLowerCase().includes(busca.toLowerCase()) ||
-      String(p.numero).includes(busca)
-    return passaStatus && passaBusca
-  })
-
-  const fmtBRL = v => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+  // Filtro memoizado — só recalcula quando pedidos, filtroStatus ou busca mudam
+  const { filtrados, totalFiltrado } = useMemo(() => {
+    const buscaLower = busca.toLowerCase()
+    const lista = pedidos.filter(p => {
+      const statusAtual = p.status || 'PENDENTE'
+      const passaStatus = filtroStatus === 'TODOS' || statusAtual === filtroStatus
+      const passaBusca  = !busca ||
+        p.cliente?.nome?.toLowerCase().includes(buscaLower) ||
+        String(p.numero).includes(busca)
+      return passaStatus && passaBusca
+    })
+    const total = lista.reduce((s, p) => s + Number(p.valorFinal || 0), 0)
+    return { filtrados: lista, totalFiltrado: total }
+  }, [pedidos, filtroStatus, busca])
 
   return (
     <div>
@@ -599,7 +607,7 @@ export default function PedidosEmitidos() {
             </span>
             <span style={{ color: '#6B7280' }}>
               Total: <strong style={{ color: '#1B6E3C' }}>
-                R$ {fmtBRL(filtrados.reduce((s, p) => s + Number(p.valorFinal || 0), 0))}
+                R$ {fmtBRL(totalFiltrado)}
               </strong>
             </span>
           </div>

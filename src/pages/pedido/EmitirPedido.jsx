@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { getClientes, getProdutos, savePedido } from '../../utils/storage'
 import { gerarPedidoPDF } from '../../utils/pdf'
 
@@ -414,10 +414,14 @@ export default function EmitirPedido() {
     return () => document.removeEventListener('keydown', onKey)
   }, [])
 
-  const clientesFiltrados = clientes.filter(c =>
-    c.nome.toLowerCase().includes(clienteBusca.toLowerCase()) ||
-    (c.cnpjCpf && c.cnpjCpf.includes(clienteBusca))
-  ).slice(0, 8)
+  // Memoizado: só recalcula quando clientes ou texto de busca mudam
+  const clientesFiltrados = useMemo(() => {
+    const q = clienteBusca.toLowerCase()
+    return clientes.filter(c =>
+      c.nome.toLowerCase().includes(q) ||
+      (c.cnpjCpf && c.cnpjCpf.includes(clienteBusca))
+    ).slice(0, 8)
+  }, [clientes, clienteBusca])
 
   function selecionarCliente(c) {
     setClienteSelecionado(c)
@@ -444,10 +448,13 @@ export default function EmitirPedido() {
     setItens(prev => prev.filter((_, i) => i !== index))
   }
 
-  const totalItens = itens.reduce((s, i) => s + (Number(i.quantidade) || 0), 0)
-  const totalValor = itens.reduce((s, i) => s + (Number(i.vrTotal)    || 0), 0)
-  const valorFinal = Math.max(0, totalValor - Number(desconto || 0))
-  const fmtBRL = v => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  // Memoizado: só recalcula quando itens ou desconto mudam
+  const { totalItens, totalValor, valorFinal } = useMemo(() => {
+    const tItens = itens.reduce((s, i) => s + (Number(i.quantidade) || 0), 0)
+    const tValor = itens.reduce((s, i) => s + (Number(i.vrTotal)    || 0), 0)
+    const vFinal = Math.max(0, tValor - Number(desconto || 0))
+    return { totalItens: tItens, totalValor: tValor, valorFinal: vFinal }
+  }, [itens, desconto])
 
   async function handleEmitir(e) {
     e.preventDefault()
