@@ -11,7 +11,7 @@ async function fetchProfile(userId) {
       .eq('id', userId)
       .single()
     if (error) {
-      console.warn('[Auth] fetchProfile erro:', error.message, '| code:', error.code)
+      console.warn('[Auth] fetchProfile erro:', error.message)
       return null
     }
     return data || null
@@ -19,6 +19,14 @@ async function fetchProfile(userId) {
     console.warn('[Auth] fetchProfile exception:', e)
     return null
   }
+}
+
+// Busca profile com limite de tempo — nunca trava mais de `ms` ms
+function fetchProfileComTimeout(userId, ms = 5000) {
+  return Promise.race([
+    fetchProfile(userId),
+    new Promise(resolve => setTimeout(() => resolve(null), ms)),
+  ])
 }
 
 export function AuthProvider({ children }) {
@@ -29,10 +37,11 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true
 
-    // Safety timeout de 8 s — garante que a UI nunca fica presa eternamente
+    // Safety net: se por algum motivo nenhum evento auth disparar em 10s,
+    // libera a UI para não travar o spinner para sempre.
     const safetyTimeout = setTimeout(() => {
       if (mounted) setLoading(false)
-    }, 8000)
+    }, 10000)
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -40,24 +49,23 @@ export function AuthProvider({ children }) {
 
         const u = session?.user ?? null
 
-        // Sem usuário → volta para login
+        // ── Sem sessão → garante estado limpo e libera a UI ──────────
         if (!u) {
           clearTimeout(safetyTimeout)
           if (mounted) { setUser(null); setProfile(null); setLoading(false) }
           return
         }
 
-        // Todos os eventos com usuário usam o mesmo fluxo:
-        // busca o profile com timeout de 5 s e só então libera a UI.
-        // Isso garante que user + profile chegam juntos e evita flashes
-        // de estado intermediário que causavam tela branca.
+        // ── Com sessão: busca profile antes de liberar a UI ───────────
+        // Timeout de 5 s garante que cold start do banco não trava o login.
+        // user + profile + loading são atualizados juntos para evitar
+        // estado intermediário que causava tela branca.
         clearTimeout(safetyTimeout)
-        const p = await Promise.race([
-          fetchProfile(u.id),
-          new Promise(resolve => setTimeout(() => resolve(null), 5000)),
-        ])
+        const p = await fetchProfileComTimeout(u.id, 5000)
         if (!mounted) return
-        setUser(u); setProfile(p); setLoading(false)
+        setUser(u)
+        setProfile(p)
+        setLoading(false)
       }
     )
 
@@ -72,7 +80,7 @@ export function AuthProvider({ children }) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw new Error(error.message)
 
-    // Verifica conta desativada imediatamente após o login
+    // Verifica conta desativada — consulta mínima e direta
     const { data: p } = await supabase
       .from('profiles')
       .select('ativo')
@@ -83,7 +91,8 @@ export function AuthProvider({ children }) {
       await supabase.auth.signOut()
       throw new Error('Sua conta foi desativada. Entre em contato com o administrador.')
     }
-    // O onAuthStateChange (SIGN_IN) cuida de setUser/setProfile/setLoading
+    // A navegação acontece via useEffect no Login quando o onAuthStateChange
+    // disparar e definir user + profile + loading = false
   }
 
   async function signOut() {
