@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
@@ -26,17 +26,13 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // Cache do profile buscado durante signIn() para evitar double-fetch:
-  // signIn() já consulta o profile → guarda aqui → SIGN_IN event consome e limpa.
-  const pendingProfile = useRef(null)
-
   useEffect(() => {
     let mounted = true
 
-    // Safety timeout de 10 s (reduzido de 30 s)
+    // Safety timeout de 8 s — garante que a UI nunca fica presa eternamente
     const safetyTimeout = setTimeout(() => {
       if (mounted) setLoading(false)
-    }, 10000)
+    }, 8000)
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -44,51 +40,23 @@ export function AuthProvider({ children }) {
 
         const u = session?.user ?? null
 
+        // Sem usuário → volta para login
         if (!u) {
           clearTimeout(safetyTimeout)
           if (mounted) { setUser(null); setProfile(null); setLoading(false) }
           return
         }
 
-        // ── INITIAL_SESSION: restauração ao reabrir a aba ─────────────
-        // Timeout de 5s para não travar em cold start.
-        if (event === 'INITIAL_SESSION') {
-          clearTimeout(safetyTimeout)
-          const p = await Promise.race([
-            fetchProfile(u.id),
-            new Promise(resolve => setTimeout(() => resolve(null), 5000)),
-          ])
-          if (!mounted) return
-          setUser(u); setProfile(p); setLoading(false)
-          return
-        }
-
-        // ── SIGN_IN: aproveita o profile já buscado em signIn() ───────
-        // Isso elimina um round-trip extra ao banco logo após o login.
-        if (event === 'SIGN_IN') {
-          clearTimeout(safetyTimeout)
-          const cached = pendingProfile.current
-          pendingProfile.current = null
-          // Se temos o cache (fluxo normal via signIn()), usa direto.
-          // Caso contrário (OAuth, magic link, etc.) busca com timeout.
-          const p = (cached?.userId === u.id)
-            ? cached.profile
-            : await Promise.race([
-                fetchProfile(u.id),
-                new Promise(resolve => setTimeout(() => resolve(null), 5000)),
-              ])
-          if (!mounted) return
-          setUser(u); setProfile(p); setLoading(false)
-          return
-        }
-
-        // ── TOKEN_REFRESHED / outros eventos ──────────────────────────
+        // Todos os eventos com usuário usam o mesmo fluxo:
+        // busca o profile com timeout de 5 s e só então libera a UI.
+        // Isso garante que user + profile chegam juntos e evita flashes
+        // de estado intermediário que causavam tela branca.
+        clearTimeout(safetyTimeout)
         const p = await Promise.race([
           fetchProfile(u.id),
           new Promise(resolve => setTimeout(() => resolve(null), 5000)),
         ])
         if (!mounted) return
-        clearTimeout(safetyTimeout)
         setUser(u); setProfile(p); setLoading(false)
       }
     )
@@ -104,17 +72,18 @@ export function AuthProvider({ children }) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw new Error(error.message)
 
-    // Busca o profile completo UMA vez aqui e guarda no cache.
-    // O handler SIGN_IN vai consumir esse cache em vez de fazer outro round-trip.
-    const p = await fetchProfile(data.user.id)
+    // Verifica conta desativada imediatamente após o login
+    const { data: p } = await supabase
+      .from('profiles')
+      .select('ativo')
+      .eq('id', data.user.id)
+      .maybeSingle()
 
     if (p?.ativo === false) {
       await supabase.auth.signOut()
       throw new Error('Sua conta foi desativada. Entre em contato com o administrador.')
     }
-
-    // Salva no ref para o onAuthStateChange SIGN_IN aproveitar
-    pendingProfile.current = { userId: data.user.id, profile: p }
+    // O onAuthStateChange (SIGN_IN) cuida de setUser/setProfile/setLoading
   }
 
   async function signOut() {
