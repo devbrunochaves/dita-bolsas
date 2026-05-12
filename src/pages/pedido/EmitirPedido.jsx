@@ -2,9 +2,11 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { getClientes, getProdutos, savePedido } from '../../utils/storage'
 import { gerarPedidoPDF } from '../../utils/pdf'
 
+// Formatador BRL compartilhado entre todos os componentes deste módulo
+const fmtBRL = v => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
 // ── Modal de sucesso ─────────────────────────────────────────
 function ModalSucesso({ pedido, onFechar }) {
-  const fmtBRL = v => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   async function handleCompartilhar() {
     const pdfFile = pedido.pdfBlob
@@ -211,8 +213,6 @@ function ModalProduto({ produtos, onAdicionar, onClose, itemInicial }) {
   )
   const [quantidade, setQuantidade] = useState(itemInicial?.quantidade || '')
   const [observacoes, setObservacoes] = useState(itemInicial?.observacoes || '')
-
-  const fmtBRL = v => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
 
   function handleSelect(e) {
     const codigo = e.target.value
