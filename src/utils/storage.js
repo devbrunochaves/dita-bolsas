@@ -364,8 +364,10 @@ export async function savePedido(pedido) {
 
 export async function updatePedido(id, campos) {
   const row = {}
-  if (campos.desconto    !== undefined) row.desconto         = Number(campos.desconto || 0)
-  if (campos.observacoes !== undefined) row.observacoes      = campos.observacoes || ''
+  if (campos.itens          !== undefined) row.itens           = campos.itens
+  if (campos.valorFinal     !== undefined) row.valor_final     = Number(campos.valorFinal || 0)
+  if (campos.desconto       !== undefined) row.desconto        = Number(campos.desconto || 0)
+  if (campos.observacoes    !== undefined) row.observacoes     = campos.observacoes || ''
   if (campos.formaPagamento !== undefined) row.forma_pagamento = campos.formaPagamento || null
   if (campos.parcelasBoleto !== undefined) row.parcelas_boleto = campos.parcelasBoleto || null
 
