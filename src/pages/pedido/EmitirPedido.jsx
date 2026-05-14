@@ -777,6 +777,32 @@ export default function EmitirPedido() {
               </div>
             ))}
 
+            {/* Info Pix */}
+            {formaPagamento === 'pix' && (
+              <div style={{
+                background: '#F0FDF4', border: '1.5px solid #86EFAC', borderRadius: 10,
+                padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 4,
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#1B6E3C', marginBottom: 4 }}>⚡ Dados para pagamento via Pix</div>
+                <div style={{ fontSize: 14, color: '#374151' }}><strong>Chave Pix:</strong> 19.943.654/0001-87</div>
+                <div style={{ fontSize: 14, color: '#374151' }}><strong>Banco:</strong> Sicoob</div>
+                <div style={{ fontSize: 14, color: '#374151' }}><strong>Favorecido:</strong> Maria do Socorro Gomes dos Santos</div>
+              </div>
+            )}
+
+            {/* Info Link de Pagamento */}
+            {formaPagamento === 'link' && (
+              <div style={{
+                background: '#EFF6FF', border: '1.5px solid #BFDBFE', borderRadius: 10,
+                padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 10,
+              }}>
+                <span style={{ fontSize: 20 }}>ℹ️</span>
+                <span style={{ fontSize: 14, color: '#1E40AF', fontWeight: 500 }}>
+                  O link será enviado pelo setor financeiro para o WhatsApp do cliente.
+                </span>
+              </div>
+            )}
+
             {/* Campo de parcelas — só aparece quando Boleto está selecionado */}
             {formaPagamento === 'boleto' && (
               <div style={{
