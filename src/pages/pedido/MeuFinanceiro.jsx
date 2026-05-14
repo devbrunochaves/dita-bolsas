@@ -74,7 +74,7 @@ function Card({ icon, label, valor, sub, color, bg, border }) {
 
 // ── Página ───────────────────────────────────────────────────
 export default function MeuFinanceiro() {
-  const { profile } = useAuth()
+  const { profile, loading: authLoading } = useAuth()
   const [pedidos, setPedidos]   = useState([])
   const [loading, setLoading]   = useState(true)
   const [periodo, setPeriodo]   = useState('mes_atual')
@@ -103,7 +103,9 @@ export default function MeuFinanceiro() {
   }
 
   useEffect(() => {
-    if (!nomeVendedor) return
+    // Aguarda o auth terminar; se terminou e não há perfil, libera o spinner
+    if (authLoading) return
+    if (!nomeVendedor) { setLoading(false); return }
     setLoading(true)
     const range = periodo === 'personalizado'
       ? { inicio: customInicio || null, fim: customFim || null }
@@ -112,7 +114,7 @@ export default function MeuFinanceiro() {
     getFinanceiro({ inicio: range.inicio, fim: range.fim, vendedor: nomeVendedor })
       .then(data => { setPedidos(data); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [nomeVendedor, periodo, customInicio, customFim])
+  }, [authLoading, nomeVendedor, periodo, customInicio, customFim])
 
   // ── Cálculos ─────────────────────────────────────────────────
   const { faturamento, comissoesReceber, totalPedidos, qtdPagos } = useMemo(() => {
