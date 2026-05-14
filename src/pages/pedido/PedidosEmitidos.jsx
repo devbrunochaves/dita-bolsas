@@ -245,6 +245,9 @@ function PedidoModal({ pedido, isAdmin, onClose, onStatusChange, onDelete, onUpd
       await updatePedido(pedido.id, campos)
       onUpdate(pedido.id, campos)
       setEditMode(false)
+    } catch (err) {
+      console.error('[PedidoModal] Erro ao salvar:', err)
+      alert(`Erro ao salvar pedido: ${err.message || 'Tente novamente.'}`)
     } finally {
       setSalvando(false)
     }
