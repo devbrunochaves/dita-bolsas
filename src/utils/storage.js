@@ -304,14 +304,10 @@ export async function savePedido(pedido) {
   const valorFinal        = Number(pedido.valorFinal || 0)
   const valorComissao     = parseFloat(((valorFinal * comissaoPercent) / 100).toFixed(2))
 
-  // Busca próximo número via MAX — muito mais rápido que COUNT(*) em tabelas grandes
-  const { data: maxRow } = await supabase
-    .from('pedidos')
-    .select('numero')
-    .order('numero', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  const count = maxRow?.numero ?? 0   // reutiliza nome para manter a linha abaixo sem alterar
+  // Busca próximo número via função SECURITY DEFINER — ignora RLS e retorna o MAX global
+  // (sem isso cada vendedor via apenas seus próprios pedidos e todos começavam no #1)
+  const { data: nextNumero } = await supabase.rpc('get_next_pedido_numero')
+  const count = (nextNumero ?? 1) - 1   // count+1 = nextNumero
 
   // Data do pedido — pode ser retroativa (enviada pelo formulário) ou agora
   const dataPedido = pedido.data
