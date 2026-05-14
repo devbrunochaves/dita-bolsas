@@ -22,11 +22,20 @@ async function fetchProfile(userId) {
 }
 
 // Busca profile com limite de tempo — nunca trava mais de `ms` ms
-function fetchProfileComTimeout(userId, ms = 5000) {
+function fetchProfileComTimeout(userId, ms = 15000) {
   return Promise.race([
     fetchProfile(userId),
     new Promise(resolve => setTimeout(() => resolve(null), ms)),
   ])
+}
+
+// Busca profile com retry: tenta uma vez e, se falhar, aguarda e tenta de novo
+async function fetchProfileComRetry(userId) {
+  const p = await fetchProfileComTimeout(userId, 12000)
+  if (p) return p
+  // Cold start do Supabase pode ultrapassar 12 s — aguarda 3 s e tenta mais uma vez
+  await new Promise(resolve => setTimeout(resolve, 3000))
+  return fetchProfileComTimeout(userId, 15000)
 }
 
 export function AuthProvider({ children }) {
@@ -61,7 +70,7 @@ export function AuthProvider({ children }) {
         // user + profile + loading são atualizados juntos para evitar
         // estado intermediário que causava tela branca.
         clearTimeout(safetyTimeout)
-        const p = await fetchProfileComTimeout(u.id, 5000)
+        const p = await fetchProfileComRetry(u.id)
         if (!mounted) return
         setUser(u)
         setProfile(p)
