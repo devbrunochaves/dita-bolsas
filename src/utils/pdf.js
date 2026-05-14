@@ -19,7 +19,7 @@ function fmtData(dataISO) {
 }
 
 export function gerarPedidoPDF(pedido) {
-  const { cliente, itens = [], desconto = 0, observacoes = 'Orçamento válido pelo período de 30 dias', data } = pedido;
+  const { cliente, itens = [], desconto = 0, observacoes = '', data, formaPagamento, parcelasBoleto, valorFinal: vFinalPedido } = pedido;
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const PW = doc.internal.pageSize.getWidth();   // 210
@@ -245,20 +245,62 @@ export function gerarPedidoPDF(pedido) {
   y = doc.lastAutoTable.finalY + 5;
 
   // =============================================
-  // OBSERVAÇÕES
+  // OBSERVAÇÕES + FORMA DE PAGAMENTO
   // =============================================
+
+  // Monta o texto da forma de pagamento
+  let pgtoLabel = ''
+  if (formaPagamento === 'pix') {
+    pgtoLabel = 'Pix — Chave: 19.943.654/0001-87 | Banco Sicoob | Favorecido: Maria do Socorro Gomes dos Santos'
+  } else if (formaPagamento === 'boleto') {
+    const nParc = Number(parcelasBoleto || 1)
+    const vFinal = Number(vFinalPedido || valorFinal)
+    if (nParc > 1) {
+      pgtoLabel = `Boleto Bancário — ${nParc}x de ${fmtBRL(vFinal / nParc)}`
+    } else {
+      pgtoLabel = 'Boleto Bancário — À vista'
+    }
+  } else if (formaPagamento === 'link') {
+    pgtoLabel = 'Link de Pagamento — O link será enviado pelo setor financeiro para o WhatsApp do cliente.'
+  }
+
+  const temObs  = observacoes && observacoes.trim()
+  const temPgto = !!pgtoLabel
+
+  // Calcula altura do box dinamicamente
+  const linhasObs  = temObs  ? doc.splitTextToSize(observacoes.trim(), W - 32) : []
+  const linhasPgto = temPgto ? doc.splitTextToSize(pgtoLabel, W - 40)          : []
+  const altObs     = temObs  ? linhasObs.length  * 4.5 + 2 : 0
+  const altPgto    = temPgto ? linhasPgto.length * 4.5 + 2 : 0
+  const altBox     = Math.max(18, (temObs ? 8 : 0) + altObs + (temPgto ? (temObs ? 8 : 6) : 0) + altPgto + 4)
+
   doc.setFillColor(255, 255, 255);
   doc.setDrawColor(...LGRAY);
   doc.setLineWidth(0.3);
-  doc.roundedRect(MAR, y, W, 20, 1, 1, 'FD');
+  doc.roundedRect(MAR, y, W, altBox, 1, 1, 'FD');
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(...BLACK);
-  doc.text('Observações: ', cL, y + 6);
-  doc.setFont('helvetica', 'normal');
-  doc.text(observacoes || 'Orçamento válido pelo período de 30 dias', cL + 24, y + 6);
-  y += 24;
+  let yBox = y + 6
+
+  if (temObs) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...BLACK);
+    doc.text('Observações:', cL, yBox);
+    doc.setFont('helvetica', 'normal');
+    doc.text(linhasObs, cL + 24, yBox);
+    yBox += altObs + (temPgto ? 6 : 0)
+  }
+
+  if (temPgto) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...BLACK);
+    doc.text('Pagamento:', cL, yBox);
+    doc.setFont('helvetica', 'normal');
+    doc.text(linhasPgto, cL + 22, yBox);
+  }
+
+  y += altBox + 4;
 
   // =============================================
   // RODAPÉ — Assinatura + Data
