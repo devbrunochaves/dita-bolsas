@@ -359,6 +359,31 @@ function PedidoModal({ pedido, isAdmin, onClose, onStatusChange, onDelete }) {
               </div>
             </section>
 
+            {/* ── Forma de pagamento ── */}
+            {pedido.formaPagamento && (
+              <section>
+                <h3 style={{ fontSize: 12, fontWeight: 700, color: '#1B6E3C', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                  💳 Forma de Pagamento
+                </h3>
+                <div style={{
+                  background: '#F8FAFC', border: '1px solid #E5E7EB', borderRadius: 12,
+                  padding: '14px 18px', fontSize: 14, color: '#374151', display: 'flex', alignItems: 'center', gap: 10,
+                }}>
+                  <span style={{ fontSize: 18 }}>
+                    {{ pix: '⚡', boleto: '🏦', link: '🔗' }[pedido.formaPagamento] || '💳'}
+                  </span>
+                  <span style={{ fontWeight: 600 }}>
+                    {{ pix: 'Pix', boleto: 'Boleto Bancário', link: 'Link de Pagamento' }[pedido.formaPagamento] || pedido.formaPagamento}
+                  </span>
+                  {pedido.formaPagamento === 'boleto' && pedido.parcelasBoleto > 1 && (
+                    <span style={{ color: '#6B7280', fontSize: 13 }}>
+                      — {pedido.parcelasBoleto}x de R$ {Number(pedido.valorFinal / pedido.parcelasBoleto).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  )}
+                </div>
+              </section>
+            )}
+
             {/* ── Observações ── */}
             {pedido.observacoes && (
               <section>

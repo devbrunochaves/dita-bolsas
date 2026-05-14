@@ -326,6 +326,9 @@ export async function savePedido(pedido) {
     emitido_por:         nomeEmitente,
     user_id:             user?.id || null,
     created_at:          dataPedido,
+    // Pagamento
+    forma_pagamento:     pedido.formaPagamento  || null,
+    parcelas_boleto:     pedido.parcelasBoleto  || null,
     // Financeiro
     status_financeiro:   'pendente',
     comissao_percentual: comissaoPercent,
@@ -400,8 +403,10 @@ function mapPedido(r) {
     observacoes:         r.observacoes || '',
     dataCriacao:         r.created_at,
     status:              r.status || 'PENDENTE',
-    emitidoPor:          r.emitido_por || null,
-    userId:              r.user_id || null,
+    emitidoPor:          r.emitido_por    || null,
+    userId:              r.user_id        || null,
+    formaPagamento:      r.forma_pagamento || null,
+    parcelasBoleto:      r.parcelas_boleto || null,
     // Financeiro
     statusFinanceiro:    r.status_financeiro  || 'pendente',
     dataVencimento:      r.data_vencimento    || null,

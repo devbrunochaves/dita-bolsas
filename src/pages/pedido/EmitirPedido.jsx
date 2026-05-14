@@ -383,7 +383,9 @@ export default function EmitirPedido() {
   const [dataPedido, setDataPedido]                 = useState(() => new Date().toISOString().split('T')[0])
   const [itens, setItens]                           = useState([])
   const [desconto, setDesconto]                     = useState('')
-  const [observacoes, setObservacoes]               = useState('Orçamento válido pelo período de 30 dias')
+  const [observacoes, setObservacoes]               = useState('')
+  const [formaPagamento, setFormaPagamento]         = useState('')
+  const [parcelasBoleto, setParcelasBoleto]         = useState('1')
   const [modalAberto, setModalAberto]               = useState(false)
   const [editIndex, setEditIndex]                   = useState(null)
   const [pedidoEmitido, setPedidoEmitido]           = useState(null)
@@ -465,12 +467,14 @@ export default function EmitirPedido() {
     setErroEmitir('')
 
     const pedido = {
-      cliente:    clienteSelecionado,
+      cliente:        clienteSelecionado,
       itens,
-      desconto:   Number(desconto || 0),
+      desconto:       Number(desconto || 0),
       valorFinal,
       observacoes,
-      data:       dataPedido,
+      formaPagamento: formaPagamento || null,
+      parcelasBoleto: formaPagamento === 'boleto' ? Number(parcelasBoleto || 1) : null,
+      data:           dataPedido,
     }
 
     try {
@@ -485,7 +489,9 @@ export default function EmitirPedido() {
       setClienteSelecionado(null)
       setItens([])
       setDesconto('')
-      setObservacoes('Orçamento válido pelo período de 30 dias')
+      setObservacoes('')
+      setFormaPagamento('')
+      setParcelasBoleto('1')
     } catch (err) {
       console.error('[EmitirPedido] Erro ao emitir:', err)
       setErroEmitir(err.message || 'Erro desconhecido ao salvar o pedido.')
@@ -498,7 +504,8 @@ export default function EmitirPedido() {
     if (!window.confirm('Limpar todos os dados do pedido?')) return
     setClienteBusca(''); setClienteSelecionado(null)
     setItens([]); setDesconto('')
-    setObservacoes('Orçamento válido pelo período de 30 dias')
+    setObservacoes('')
+    setFormaPagamento(''); setParcelasBoleto('1')
     setDataPedido(new Date().toISOString().split('T')[0])
   }
 
@@ -731,9 +738,84 @@ export default function EmitirPedido() {
           )}
         </div>
 
+        {/* ===== FORMA DE PAGAMENTO ===== */}
+        <div className="ped-card" style={{ marginBottom: 20 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1B6E3C', marginBottom: 16 }}>💳 Forma de Pagamento</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+            {/* Opções */}
+            {[
+              { value: 'pix',   label: 'Pix',               icon: '⚡' },
+              { value: 'boleto', label: 'Boleto Bancário',   icon: '🏦' },
+              { value: 'link',   label: 'Link de Pagamento', icon: '🔗' },
+            ].map(op => (
+              <div
+                key={op.value}
+                onClick={() => setFormaPagamento(op.value)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  border: `1.5px solid ${formaPagamento === op.value ? '#1B6E3C' : '#E5E7EB'}`,
+                  borderRadius: 10, padding: '12px 16px', cursor: 'pointer',
+                  background: formaPagamento === op.value ? '#F0FDF4' : 'white',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <div style={{
+                  width: 20, height: 20, borderRadius: '50%',
+                  border: `2px solid ${formaPagamento === op.value ? '#1B6E3C' : '#D1D5DB'}`,
+                  background: formaPagamento === op.value ? '#1B6E3C' : 'white',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  {formaPagamento === op.value && (
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'white' }} />
+                  )}
+                </div>
+                <span style={{ fontSize: 16 }}>{op.icon}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: formaPagamento === op.value ? '#1B6E3C' : '#374151' }}>
+                  {op.label}
+                </span>
+              </div>
+            ))}
+
+            {/* Campo de parcelas — só aparece quando Boleto está selecionado */}
+            {formaPagamento === 'boleto' && (
+              <div style={{
+                background: '#FFFBEB', border: '1.5px solid #FDE68A', borderRadius: 10,
+                padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
+              }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#92400E' }}>Dividido em quantas vezes?</span>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {[1, 2, 3, 4, 5, 6].map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setParcelasBoleto(String(n))}
+                      style={{
+                        width: 44, height: 36, borderRadius: 8, fontSize: 14, fontWeight: 700,
+                        cursor: 'pointer', border: '1.5px solid',
+                        borderColor: parcelasBoleto === String(n) ? '#1B6E3C' : '#D1D5DB',
+                        background: parcelasBoleto === String(n) ? '#1B6E3C' : 'white',
+                        color: parcelasBoleto === String(n) ? 'white' : '#374151',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {n}x
+                    </button>
+                  ))}
+                </div>
+                {Number(parcelasBoleto) > 1 && valorFinal > 0 && (
+                  <span style={{ fontSize: 13, color: '#92400E', fontWeight: 600 }}>
+                    = R$ {fmtBRL(valorFinal / Number(parcelasBoleto))} / parcela
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* ===== TOTAIS ===== */}
         <div className="ped-card" style={{ marginBottom: 20 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 24, alignItems: 'end' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 24, alignItems: 'start' }}>
             <div className="ped-form-group">
               <label>Desconto (R$)</label>
               <input
@@ -745,9 +827,15 @@ export default function EmitirPedido() {
             </div>
             <div className="ped-form-group">
               <label>Observações gerais do pedido</label>
-              <input
+              <textarea
                 value={observacoes} onChange={e => setObservacoes(e.target.value)}
-                style={{ border: '1.5px solid #D1D5DB', borderRadius: 6, padding: '10px 14px', fontSize: 14, outline: 'none', width: '100%' }}
+                placeholder="Ex: Entregar até sexta-feira, embalar separado..."
+                rows={4}
+                style={{
+                  border: '1.5px solid #D1D5DB', borderRadius: 6, padding: '10px 14px',
+                  fontSize: 14, outline: 'none', width: '100%', resize: 'vertical',
+                  fontFamily: 'inherit', lineHeight: 1.5, boxSizing: 'border-box',
+                }}
               />
             </div>
             <div style={{ background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 10, padding: '16px 20px' }}>
