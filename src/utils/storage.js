@@ -282,6 +282,7 @@ export async function getPedidos({ limite = 200, diasAtras = null } = {}) {
   let query = supabase
     .from('pedidos')
     .select('*')
+    .order('numero', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(limite)
 
