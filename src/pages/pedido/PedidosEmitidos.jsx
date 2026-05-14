@@ -191,17 +191,33 @@ function PedidoModal({ pedido, isAdmin, onClose, onStatusChange, onDelete }) {
 
           {/* ── Cabeçalho do modal ── */}
           <div style={{
-            padding: '20px 28px 16px', borderBottom: '1px solid #F3F4F6',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '16px 20px 14px', borderBottom: '1px solid #F3F4F6',
             position: 'sticky', top: 0, background: 'white', zIndex: 1,
-            borderRadius: '18px 18px 0 0', flexWrap: 'wrap', gap: 10,
+            borderRadius: '18px 18px 0 0',
+            display: 'grid',
+            gridTemplateColumns: '1fr auto',
+            gap: '8px 12px',
+            alignItems: 'center',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Linha 1: número + status | botão fechar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: 22, fontWeight: 900, color: '#1B6E3C' }}>#{pedido.numero || '-'}</span>
               <StatusBadge status={pedido.status || 'PENDENTE'} />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              {/* Botão Histórico */}
+            {/* Botão fechar — sempre no canto superior direito */}
+            <button
+              onClick={onClose}
+              style={{
+                width: 36, height: 36, borderRadius: 9, border: '1px solid #E5E7EB',
+                background: '#F9FAFB', color: '#6B7280', cursor: 'pointer',
+                fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 700, flexShrink: 0,
+              }}
+            >
+              ×
+            </button>
+            {/* Linha 2: botões de ação (ocupam as 2 colunas) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', gridColumn: '1 / -1' }}>
               <button
                 onClick={() => setVerHistorico(true)}
                 style={{
@@ -213,7 +229,6 @@ function PedidoModal({ pedido, isAdmin, onClose, onStatusChange, onDelete }) {
               >
                 📋 Histórico
               </button>
-              {/* Botão Baixar PDF */}
               <button
                 onClick={() => gerarPedidoPDF({ ...pedido, data: pedido.dataCriacao })}
                 style={{
@@ -225,7 +240,6 @@ function PedidoModal({ pedido, isAdmin, onClose, onStatusChange, onDelete }) {
               >
                 📥 Baixar PDF
               </button>
-              {/* Botão Excluir (admin only) */}
               {isAdmin && (
                 <button
                   onClick={() => setConfirmarExcl(true)}
@@ -239,18 +253,6 @@ function PedidoModal({ pedido, isAdmin, onClose, onStatusChange, onDelete }) {
                   🗑️
                 </button>
               )}
-              {/* Fechar */}
-              <button
-                onClick={onClose}
-                style={{
-                  width: 36, height: 36, borderRadius: 9, border: '1px solid #E5E7EB',
-                  background: '#F9FAFB', color: '#6B7280', cursor: 'pointer',
-                  fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontWeight: 700,
-                }}
-              >
-                ×
-              </button>
             </div>
           </div>
 
