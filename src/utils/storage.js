@@ -362,6 +362,22 @@ export async function savePedido(pedido) {
   return mapPedido(data)
 }
 
+export async function updatePedido(id, campos) {
+  const row = {}
+  if (campos.desconto    !== undefined) row.desconto         = Number(campos.desconto || 0)
+  if (campos.observacoes !== undefined) row.observacoes      = campos.observacoes || ''
+  if (campos.formaPagamento !== undefined) row.forma_pagamento = campos.formaPagamento || null
+  if (campos.parcelasBoleto !== undefined) row.parcelas_boleto = campos.parcelasBoleto || null
+
+  const { error } = await withTimeout(
+    supabase.from('pedidos').update(row).eq('id', id)
+  )
+  check(error, 'updatePedido')
+
+  const { user, profile } = await getUserAndProfile()
+  logHistorico(id, 'Pedido editado', user?.id, profile?.nome)
+}
+
 export async function deletePedido(id) {
   const { error } = await supabase.from('pedidos').delete().eq('id', id)
   check(error, 'deletePedido')

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { getPedidos, deletePedido, getPedidoHistorico } from '../../utils/storage'
+import { getPedidos, deletePedido, getPedidoHistorico, updatePedido } from '../../utils/storage'
 import { useAuth } from '../../contexts/AuthContext'
 import { StatusSelect, StatusBadge, STATUS_CONFIG, STATUS_LIST } from '../../components/StatusSelect'
 import { gerarPedidoPDF } from '../../utils/pdf'
@@ -149,10 +149,201 @@ function ModalExcluirPedido({ pedido, onClose, onConfirm }) {
   )
 }
 
+const FORMAS_PGT = [
+  { value: 'pix',    label: 'Pix',               icon: '⚡' },
+  { value: 'boleto', label: 'Boleto Bancário',    icon: '🏦' },
+  { value: 'link',   label: 'Link de Pagamento',  icon: '🔗' },
+]
+
+// ── Modal de edição do pedido ─────────────────────────────────
+function ModalEditarPedido({ pedido, onClose, onSalvar }) {
+  const [formaPagamento, setFormaPagamento] = useState(pedido.formaPagamento || '')
+  const [parcelasBoleto, setParcelasBoleto] = useState(String(pedido.parcelasBoleto || 1))
+  const [desconto,       setDesconto]       = useState(String(pedido.desconto || ''))
+  const [observacoes,    setObservacoes]    = useState(pedido.observacoes || '')
+  const [salvando,       setSalvando]       = useState(false)
+
+  const fmtBRL = v => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const valorFinal = Number(pedido.valorFinal || 0) - Number(desconto || 0)
+
+  async function handleSalvar() {
+    setSalvando(true)
+    try {
+      await updatePedido(pedido.id, {
+        formaPagamento: formaPagamento || null,
+        parcelasBoleto: formaPagamento === 'boleto' ? Number(parcelasBoleto || 1) : null,
+        desconto:       Number(desconto || 0),
+        observacoes,
+      })
+      onSalvar({
+        formaPagamento: formaPagamento || null,
+        parcelasBoleto: formaPagamento === 'boleto' ? Number(parcelasBoleto || 1) : null,
+        desconto:       Number(desconto || 0),
+        observacoes,
+      })
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <div onClick={e => e.target === e.currentTarget && onClose()} style={{
+      position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(0,0,0,0.55)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px',
+    }}>
+      <div style={{
+        background: 'white', borderRadius: 18, width: '100%', maxWidth: 520,
+        maxHeight: '90vh', overflowY: 'auto',
+        boxShadow: '0 24px 80px rgba(0,0,0,0.3)',
+        display: 'flex', flexDirection: 'column',
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: '18px 24px 14px', borderBottom: '1px solid #F3F4F6',
+          display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center',
+          position: 'sticky', top: 0, background: 'white', borderRadius: '18px 18px 0 0', zIndex: 1,
+        }}>
+          <div>
+            <h3 style={{ fontSize: 16, fontWeight: 800, color: '#1F2937', margin: 0 }}>✏️ Editar Pedido #{pedido.numero}</h3>
+            <p style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>Forma de pagamento, desconto e observações</p>
+          </div>
+          <button onClick={onClose} style={{
+            width: 34, height: 34, borderRadius: 8, border: '1px solid #E5E7EB',
+            background: '#F9FAFB', color: '#6B7280', cursor: 'pointer',
+            fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700,
+          }}>×</button>
+        </div>
+
+        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+          {/* Forma de pagamento */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 10 }}>
+              💳 Forma de Pagamento
+            </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {FORMAS_PGT.map(op => (
+                <div key={op.value} onClick={() => setFormaPagamento(op.value)} style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  border: `1.5px solid ${formaPagamento === op.value ? '#1B6E3C' : '#E5E7EB'}`,
+                  borderRadius: 10, padding: '11px 14px', cursor: 'pointer',
+                  background: formaPagamento === op.value ? '#F0FDF4' : 'white', transition: 'all 0.15s',
+                }}>
+                  <div style={{
+                    width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                    border: `2px solid ${formaPagamento === op.value ? '#1B6E3C' : '#D1D5DB'}`,
+                    background: formaPagamento === op.value ? '#1B6E3C' : 'white',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {formaPagamento === op.value && <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'white' }} />}
+                  </div>
+                  <span style={{ fontSize: 15 }}>{op.icon}</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: formaPagamento === op.value ? '#1B6E3C' : '#374151' }}>{op.label}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Info Pix */}
+            {formaPagamento === 'pix' && (
+              <div style={{ marginTop: 10, background: '#F0FDF4', border: '1.5px solid #86EFAC', borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#1B6E3C', marginBottom: 2 }}>⚡ Dados para pagamento via Pix</div>
+                <div style={{ fontSize: 13, color: '#374151' }}><strong>Chave Pix:</strong> 19.943.654/0001-87</div>
+                <div style={{ fontSize: 13, color: '#374151' }}><strong>Banco:</strong> Sicoob</div>
+                <div style={{ fontSize: 13, color: '#374151' }}><strong>Favorecido:</strong> Maria do Socorro Gomes dos Santos</div>
+              </div>
+            )}
+
+            {/* Info Link */}
+            {formaPagamento === 'link' && (
+              <div style={{ marginTop: 10, background: '#EFF6FF', border: '1.5px solid #BFDBFE', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 18 }}>ℹ️</span>
+                <span style={{ fontSize: 13, color: '#1E40AF', fontWeight: 500 }}>O link será enviado pelo setor financeiro para o WhatsApp do cliente.</span>
+              </div>
+            )}
+
+            {/* Parcelas boleto */}
+            {formaPagamento === 'boleto' && (
+              <div style={{ marginTop: 10, background: '#FFFBEB', border: '1.5px solid #FDE68A', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#92400E' }}>Dividido em:</span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {[1,2,3,4,5,6].map(n => (
+                    <button key={n} type="button" onClick={() => setParcelasBoleto(String(n))} style={{
+                      width: 40, height: 34, borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                      border: '1.5px solid',
+                      borderColor: parcelasBoleto === String(n) ? '#1B6E3C' : '#D1D5DB',
+                      background:  parcelasBoleto === String(n) ? '#1B6E3C' : 'white',
+                      color:       parcelasBoleto === String(n) ? 'white'   : '#374151',
+                    }}>{n}x</button>
+                  ))}
+                </div>
+                {Number(parcelasBoleto) > 1 && pedido.valorFinal > 0 && (
+                  <span style={{ fontSize: 13, color: '#92400E', fontWeight: 600 }}>
+                    = R$ {fmtBRL(pedido.valorFinal / Number(parcelasBoleto))} / parcela
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Desconto */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 6 }}>
+              Desconto (R$)
+            </label>
+            <input
+              type="number" step="0.01" min="0"
+              value={desconto} onChange={e => setDesconto(e.target.value)}
+              placeholder="0,00"
+              style={{ border: '1.5px solid #D1D5DB', borderRadius: 8, padding: '10px 14px', fontSize: 14, outline: 'none', width: '100%', boxSizing: 'border-box' }}
+            />
+            {Number(desconto) > 0 && (
+              <div style={{ marginTop: 6, fontSize: 13, color: '#6B7280' }}>
+                Valor final: <strong style={{ color: '#1B6E3C' }}>R$ {fmtBRL(Math.max(0, valorFinal))}</strong>
+              </div>
+            )}
+          </div>
+
+          {/* Observações */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 6 }}>
+              Observações
+            </label>
+            <textarea
+              value={observacoes} onChange={e => setObservacoes(e.target.value)}
+              placeholder="Ex: Entregar até sexta-feira, embalar separado..."
+              rows={4}
+              style={{ border: '1.5px solid #D1D5DB', borderRadius: 8, padding: '10px 14px', fontSize: 14, outline: 'none', width: '100%', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5, boxSizing: 'border-box' }}
+            />
+          </div>
+
+          {/* Botões */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={onClose} style={{
+              flex: 1, padding: '12px', borderRadius: 10, border: '1.5px solid #E5E7EB',
+              background: 'white', color: '#374151', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+            }}>Cancelar</button>
+            <button onClick={handleSalvar} disabled={salvando} style={{
+              flex: 2, padding: '12px', borderRadius: 10, border: 'none',
+              background: salvando ? '#6B7280' : '#1B6E3C', color: 'white',
+              fontWeight: 800, fontSize: 14, cursor: salvando ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}>
+              {salvando ? (
+                <><div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />Salvando...</>
+              ) : '💾 Salvar Alterações'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Modal de detalhes do pedido ──────────────────────────────
-function PedidoModal({ pedido, isAdmin, onClose, onStatusChange, onDelete }) {
+function PedidoModal({ pedido, isAdmin, onClose, onStatusChange, onDelete, onUpdate }) {
   const [verHistorico,   setVerHistorico]   = useState(false)
   const [confirmarExcl,  setConfirmarExcl]  = useState(false)
+  const [editando,       setEditando]       = useState(false)
 
   if (!pedido) return null
 
@@ -170,6 +361,13 @@ function PedidoModal({ pedido, isAdmin, onClose, onStatusChange, onDelete }) {
           pedido={pedido}
           onClose={() => setConfirmarExcl(false)}
           onConfirm={async () => { await onDelete(pedido.id); setConfirmarExcl(false); onClose() }}
+        />
+      )}
+      {editando && (
+        <ModalEditarPedido
+          pedido={pedido}
+          onClose={() => setEditando(false)}
+          onSalvar={campos => { onUpdate(pedido.id, campos); setEditando(false) }}
         />
       )}
 
@@ -239,6 +437,17 @@ function PedidoModal({ pedido, isAdmin, onClose, onStatusChange, onDelete }) {
                 }}
               >
                 📥 Baixar PDF
+              </button>
+              <button
+                onClick={() => setEditando(true)}
+                style={{
+                  background: '#F59E0B', color: 'white', border: 'none',
+                  padding: '9px 18px', borderRadius: 9, fontWeight: 700, fontSize: 13,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                  boxShadow: '0 2px 8px rgba(245,158,11,0.3)',
+                }}
+              >
+                ✏️ Editar
               </button>
               {isAdmin && (
                 <button
@@ -464,6 +673,11 @@ export default function PedidosEmitidos() {
     setPedidos(prev => prev.filter(p => p.id !== id))
   }
 
+  const handleUpdate = useCallback((id, campos) => {
+    setPedidos(prev => prev.map(p => p.id === id ? { ...p, ...campos } : p))
+    setPedidoModal(prev => prev?.id === id ? { ...prev, ...campos } : prev)
+  }, [])
+
   // Contagens memoizadas — só recalcula quando `pedidos` muda
   const contagem = useMemo(() =>
     STATUS_LIST.reduce((acc, s) => {
@@ -497,6 +711,7 @@ export default function PedidosEmitidos() {
           onClose={() => setPedidoModal(null)}
           onStatusChange={handleStatusChange}
           onDelete={handleDelete}
+          onUpdate={handleUpdate}
         />
       )}
 
