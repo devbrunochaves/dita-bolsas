@@ -44,8 +44,17 @@ export default function PedidoLayout() {
         .ped-aside {
           width: 240px; background: #1B6E3C;
           display: flex; flex-direction: column; flex-shrink: 0;
-          position: sticky; top: 0; height: 100vh; overflow-x: hidden; z-index: 200;
+          position: sticky; top: 0; height: 100vh; overflow-x: hidden;
+          overflow-y: auto; z-index: 200;
         }
+        .ped-aside::-webkit-scrollbar { width: 4px; }
+        .ped-aside::-webkit-scrollbar-track { background: transparent; }
+        .ped-aside::-webkit-scrollbar-thumb {
+          background: rgba(255,255,255,0.25); border-radius: 100px;
+          transition: background 0.2s;
+        }
+        .ped-aside::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.5); }
+        .ped-aside { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.25) transparent; }
         .ped-mobile-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 300; }
         .ped-mobile-drawer  { display: none; position: fixed; top: 0; left: 0; bottom: 0; width: 260px; background: #1B6E3C; flex-direction: column; z-index: 400; box-shadow: 4px 0 24px rgba(0,0,0,0.2); transform: translateX(-100%); transition: transform 0.25s ease; }
         .ped-mobile-drawer.open { transform: translateX(0); }
