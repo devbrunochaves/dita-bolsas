@@ -25,6 +25,7 @@ import MeuFinanceiro from './pages/pedido/MeuFinanceiro'
 import Producao from './pages/pedido/Producao'
 import GerenciarSite from './pages/pedido/GerenciarSite'
 import Calculadora from './pages/pedido/Calculadora'
+import Atendimento from './pages/pedido/Atendimento'
 import ProductDetail from './pages/ProductDetail'
 
 // Captura erros de renderização silenciosos que causariam tela branca
@@ -90,6 +91,7 @@ export default function App() {
             <Route path="produtos/editar/:id" element={<CadastroProduto />} />
             <Route path="meu-financeiro" element={<MeuFinanceiro />} />
             <Route path="calculadora" element={<Calculadora />} />
+            <Route path="atendimento" element={<Atendimento />} />
             <Route path="colaboradores" element={
               <ProtectedRoute adminOnly>
                 <Colaboradores />
