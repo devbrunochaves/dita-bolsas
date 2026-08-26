@@ -67,7 +67,7 @@ export default function Dashboard() {
         const [cc, cp, ped] = await Promise.all([
           getCountClientes(),
           getCountProdutos(),
-          getPedidos({ limite: 50, diasAtras: 90 }),
+          getPedidos({ limite: 100000 }),
         ])
         setCountClientes(cc)
         setCountProdutos(cp)
